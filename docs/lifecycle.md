@@ -49,11 +49,9 @@ sequenceDiagram
 - **Function**: `morning-execution`
 - **Logic**: Automatically scans Firestore for orders in the `QUEUED` state. If found, it pushes them to the Zerodha trade book.
 
-## 2. Customizing the Schedule ⚙️
-You are not locked into the default timings. Because the infrastructure is defined via **Terraform**, you can easily modify the execution windows to suit your time zone or trading strategy:
-- **Location**: `terraform/scheduler.tf` (or equivalent Cloud Scheduler resources).
-- **Modification**: Update the `schedule` cron expression (e.g., changing `15 9 * * 1-5` to your preferred time).
-- **Deployment**: Simply run `.\deploy.ps1` or `./deploy.sh` after changing the cron string to apply the new schedule globally.
+- **Location**: `terraform/scheduler.tf`.
+- **Modification**: Update the `schedule` cron expression (e.g., `15 9 * * 1-5` for 9:15 AM IST).
+- **Deployment**: Run `.\deploy.ps1` to apply the new schedule globally.
 
 ## 3. Order States & Transitions
 
@@ -62,11 +60,11 @@ The system uses Firestore to track the lifecycle of every trade suggestion:
 | State | Occurs when... | User Action |
 | :--- | :--- | :--- |
 | **DRAFT** | Agent completes analysis. | Table is editable. AI columns are populated. |
-| **QUEUED** | User clicks "Confirm & Queue". | Table becomes **Read-Only**. Snapshot is saved. |
-| **EXECUTED** | Trade successfully sent to Zerodha. | Status marked as complete. |
-| **CANCELLED** | User clicks "Cancel & Edit". | Orders deleted. UI returns to editable DRAFT. |
+| **QUEUED** | User clicks "Submit for Approval". | Table becomes **Read-Only**. Snapshot is saved. |
+| **APPROVED** | User clicks "Approve Now". | System is now ready for **Automated Execution**. |
+| **COMPLETED** | Morning bot successfully places trades. | Status marked as complete. Cycle starts over. |
 
-## 3. Human-in-the-Loop Principles
-- **No Invisible Trades**: The agent cannot place an order without a user first entering the dashboard and "Confirming" the draft.
-- **Explainable Decisions**: Every suggestion is accompanied by an "AI Insight" detailing the exact news and fundamentals that drove the signal.
-- **Quantity Override**: The user can override the AI's suggested quantity to match their personal risk appetite before queuing the trade.
+## 4. Human-in-the-Loop Principles
+- **Double-Lock Safety**: You must first "Submit" and then "Approve" (locally or via email).
+- **Explainable Decisions**: Every suggestion is accompanied by an "AI Insight" detailing the exact reason for the signal.
+- **Quantity Override**: You can override the AI's suggested quantity before submitting to the queue.

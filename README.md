@@ -18,26 +18,14 @@ For a deep dive into how this system works, please refer to the following guides
 - **[Lifecycle & User Flow](docs/lifecycle.md)**: Understanding automation triggers and the "Human-in-the-Loop" process.
 - **[AI Governance & Guardrails](docs/ai_governance.md)**: How we prevent hallucinations and ensure clinical mathematical precision.
 - **[Transparency & Limitations](docs/limitations.md)**: Addressing API dependencies, token expiry, and operational risks.
-- **[Core Features](docs/features.md)**: Detailed list of analysis and dashboard capabilities.
-- **[Configuration Guide](docs/configuration.md)**: How to customize your portfolio universe and agent mindset.
 
-## 🤖 Is it Agentic?
-Yes. Unlike a standard script, this system is **Agentic** because:
-1. **Autonomous Reasoning**: The AI doesn't just follow a list; it investigates news, correlates sentiment, and decides *if* a trade is worth the risk.
-2. **Tool Use**: The "Brain" (Gemini) calls specific "Hands" (Python functions) to fetch real-time data, ensuring it never hallucinates a stock price.
-3. **Internal Feedback Loop**: The agent scoring system filters its own research, dismissing "Noise" before it ever reaches your dashboard.
+## 🤖 Standard Workflow
+The platform is designed for a **bi-monthly** rebalancing cycle:
 
-## 🎯 Why This Exists?
-Most trading bots are "Fast and Loose." This agent is **Slow and Cynical**. 
-- It treats bad news as a "Sell" signal by default.
-- It requires human confirmation before a single rupee is spent.
-- It leverages **Anti-Hallucination Guardrails** to separate AI logic from mathematical execution.
-
-## 🛠️ Tech Stack
-- **AI**: Gemini 2.0 Flash (Vertex AI)
-- **Infrastructure**: Terraform, Cloud Functions, Cloud Run, Firestore
-- **Backend**: Python 3.12, Pandas, yfinance
-- **Auth**: Kite Connect API
+1.  **⚙️ Configure**: Use the **Config** tab in the Dashboard to set your budget, stock universe, and AI risk profile. These are saved to **GCP Firestore** and act as the "Source of Truth."
+2.  **🤖 Run Analysis**: Click "Run Analysis" in the **Workspace** tab. The AI will research news and financials for your universe and propose a specific buy/sell list.
+3.  **🖥️ Review & Submit**: Review the AI rationale for each stock in the interactive table. Edit quantities if needed, then click "Submit for Approval."
+4.  **🚀 Automated Execution**: Once approved, the **Morning Execution Bot** (Cloud Scheduler) will automatically place the orders at market open (9:15 AM IST).
 
 ## 📋 Getting Started
 
@@ -46,36 +34,30 @@ Most trading bots are "Fast and Loose." This agent is **Slow and Cynical**.
 - Zerodha (Kite Connect) API credentials.
 - Terraform installed locally.
 
-### 2. Configuration
-The agent relies on two core JSON configuration files in `src/config/`:
-- `agent_config.json`: Defines the agent mindset, budget, and target portfolio.
-- `universe.json`: Defines the universe of allowable stocks with sector and cap classifications.
+### 2. Setup Secrets
+The system uses **GCP Secret Manager** for all sensitive credentials. You MUST create these secrets in your project before deploying:
 
-*See `*.example` files for templates.*
+| Secret Name | Description | Where to find it? |
+| :--- | :--- | :--- |
+| `KITE_API_KEY` | Your Zerodha App API Key. | [Kite Connect Dashboard](https://kite.trade/apps) |
+| `KITE_API_SECRET` | Your Zerodha App API Secret. | [Kite Connect Dashboard](https://kite.trade/apps) |
+| `KITE_ACCESS_TOKEN` | The 32-char session token. | Generated daily via manual login (or automated script). |
+| `ALLOWED_USER_ID` | Your Zerodha User ID (e.g. `AB1234`). | Locks the Dashboard to your specific session. |
+| `GMAIL_USER` | The Gmail address used to send reports. | Your personal Gmail address. |
+| `GMAIL_APP_PASSWORD` | A 16-character 'App Password'. | [Google Account > Security > App Passwords](https://myaccount.google.com/apppasswords) |
+| `RECIPIENT_EMAIL` | Where alerts and plans are sent. | Any email address where you want to receive nudge reports. |
 
-### 3. Setup Secrets
-The following secrets must be created in Google Secret Manager:
-- `KITE_API_KEY`
-- `KITE_API_SECRET`
-- `KITE_ACCESS_TOKEN`
-- `GMAIL_USER` (Sender email for notifications)
-- `GMAIL_APP_PASSWORD` (App password for Gmail SMTP. [How to generate](https://support.google.com/accounts/answer/185833))
-- `RECIPIENT_EMAIL` (Target email for trade reports)
-- `ALLOWED_USER_ID` (Your Zerodha User ID - used to restrict dashboard access)
+> [!TIP]
+> **Gmail App Password**: Standard Gmail passwords will NOT work. You must enable 2FA and generate a dedicated App Password for the "Mail" app on "Other (Custom name)".
 
-### 4. Deployment
-Run the deployment script for your environment:
-
-**Windows (PowerShell):**
+### 3. Deployment
+Run the unified deployment script. This will provision your Cloud Functions, Firestore database, and the Streamlit Dashboard.
 ```powershell
-.\deploy.ps1 -ProjectId YOUR_PROJECT_ID -RecipientEmail YOUR_EMAIL
+.\deploy.ps1 -ProjectId "your-gcp-project-id" -RecipientEmail "your@email.com"
 ```
 
-**Linux / macOS (Bash):**
-```bash
-chmod +x deploy.sh
-./deploy.sh YOUR_PROJECT_ID YOUR_EMAIL
-```
+### 4. Initial Load
+After deployment, go to the **Config** tab in your Streamlit Dashboard. Upload or enter your stock universe and budget. The agent will prefer these cloud values over local files.
 
 ## ⚖️ Governance
 The system uses a **Human-in-the-loop** model. The AI suggests trades, but execution requires manual approval via the Streamlit Dashboard.

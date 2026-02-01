@@ -232,62 +232,76 @@ invest_tool = Tool(
 
 # --- 4. The Execution Flow ---
 
-def save_draft_proposal(orders: list, audit_trail: str, merge: bool = False):
+def save_draft_proposal(orders: list, audit_trail: str, merge: bool = False, full_analysis: list = None):
     """
     Saves the proposed orders as a DRAFT.
-    If merge=True, updates existing draft orders for specific tickers instead of overwriting.
+    - 'orders': Actionable trades (Qty > 0).
+    - 'full_analysis': Complete list of all tickers analyzed (for Dashboard visibility).
+    - 'ui_snapshot': NEVER deleted by Agent. Dashboard manages it.
     """
     from src.utils.llm_helpers import normalize_ticker
     import math
 
-    logger.info(f"DEBUG: Saving draft with {len(orders)} orders. Merge={merge}")
+    logger.info(f"DEBUG: Saving draft. Orders={len(orders)}. Full Analysis={len(full_analysis) if full_analysis else 0}")
     project = os.environ.get("PROJECT_ID", "UNKNOWN")
     
-    # Sanitization pass for Firestore (no NaNs)
-    sanitized_orders = []
-    for o in orders:
-        clean_o = {}
-        for k, v in o.items():
-            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
-                clean_o[k] = 0.0
-            else:
-                clean_o[k] = v
-        sanitized_orders.append(clean_o)
+    # Sanitization Helper
+    def sanitize(item_list):
+        clean_list = []
+        for o in item_list:
+            clean_o = {}
+            for k, v in o.items():
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                    clean_o[k] = 0.0
+                else:
+                    clean_o[k] = v
+            clean_list.append(clean_o)
+        return clean_list
+
+    sanitized_orders = sanitize(orders)
+    sanitized_analysis = sanitize(full_analysis) if full_analysis else []
 
     try:
         db = firestore.Client(project=project)
         pending_ref = db.collection("pending_orders").document("latest")
         
         final_orders = sanitized_orders
+        final_analysis = sanitized_analysis
         final_audit = audit_trail
         
+        # Merge Logic (Preserved for specific tickers)
         if merge:
             doc = pending_ref.get()
             if doc.exists:
                 data = doc.to_dict()
                 if data.get("status") in ["DRAFT", "NONE"]:
-                    # Merge Logic (Normalization aware)
+                    # Merge Orders
                     existing_orders = data.get("orders", [])
                     existing_map = {normalize_ticker(o["ticker"]): o for o in existing_orders if "ticker" in o}
-                    
-                    # Update with new orders
                     for new_o in sanitized_orders:
-                        norm = normalize_ticker(new_o["ticker"])
-                        existing_map[norm] = new_o
-                        
+                        existing_map[normalize_ticker(new_o["ticker"])] = new_o
                     final_orders = list(existing_map.values())
+                    
+                    # Merge Analysis (Critical for UI consistency)
+                    existing_analysis = data.get("full_analysis", [])
+                    analysis_map = {normalize_ticker(o["ticker"]): o for o in existing_analysis if "ticker" in o}
+                    for new_a in sanitized_analysis:
+                        analysis_map[normalize_ticker(new_a["ticker"])] = new_a
+                    final_analysis = list(analysis_map.values())
+                    
                     final_audit = data.get("audit_trail", "") + "\n\n--- PARTIAL UPDATE ---\n" + audit_trail
         
         update_data = {
-            "orders": final_orders,
+            "orders": final_orders,          # Only Qty > 0 (Execution Queue)
+            "full_analysis": final_analysis, # ALL Tickers (UI Visibility)
             "status": "DRAFT",
             "created_at": firestore.SERVER_TIMESTAMP,
             "audit_trail": final_audit,
-            "rebalance_id": os.environ.get("DEPLOY_ID", "AUTO_RUN") # Unique marker
+            "rebalance_id": os.environ.get("DEPLOY_ID", "AUTO_RUN")
         }
         
-        # Explicitly delete any old snapshot since orders changed
-        update_data["ui_snapshot"] = firestore.DELETE_FIELD
+        # CRITICAL: Do NOT delete ui_snapshot. Dashboard manages it.
+        # update_data["ui_snapshot"] = firestore.DELETE_FIELD 
         
         pending_ref.update(update_data)
         return "DRAFT_SAVED"
@@ -434,19 +448,20 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
             # SAFETY: Check if part has text before accessing it
             if hasattr(part, "text") and part.text:
                 logger.info(f"AGENT THOUGHT: {part.text}")
-                print(f"AGENT THOUGHT: {part.text}") # Ensure it hits stdout for dashboard logs
+                print(f"AGENT THOUGHT: {part.text}") # For dashboard logs
 
         # Send ALL responses back to the model at once (Parallel Function Calling)
         response = chat.send_message(function_responses)
 
+    # --- FINAL Turn Enforcement ---
+    # Ensure the model actually provides the final JSON list if it just called tools
+    if not any(hasattr(p, "text") and ("[" in p.text) for p in response.candidates[0].content.parts):
+        logger.info("🤖 Requesting final JSON summary from Agent...")
+        response = chat.send_message("Excellent research. Now, provide the FINAL JSON array for all 30 tickers as per the required output format. No text before or after.")
+
     # Final Plan Formatting
     try:
-        # SAFETY: response.text can raise if no text parts exist
-        plan_text = ""
-        try:
-            plan_text = response.text
-        except AttributeError:
-            logger.warning("Final response contains no text part.")
+        plan_text = response.text if hasattr(response, "text") else ""
 
         # Always output all parts to logs for transparency
         for candidate in response.candidates:
@@ -484,17 +499,27 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
                     t_raw = rec.get("ticker")
                     t_norm = normalize_ticker(t_raw)
                     if t_norm:
+                        # Ensure fields are valid strings/ints
+                        rec["ticker"] = t_raw
+                        rec["signal"] = rec.get("signal", "HOLD") or "HOLD"
+                        rec["reason"] = rec.get("reason", "No detailed rationale provided.") or "No rationale."
+                        rec["quantity"] = int(rec.get("quantity", 0) or 0)
+                        
                         if t_norm in tool_map_norm:
-                            # Tool results (math) OVERRIDE AI recommendations for 'quantity'
                             tool_match = tool_map_norm[t_norm]
-                            rec["quantity"] = tool_match.get("quantity", rec.get("quantity", 0))
+                            # Tool results (math) OVERRIDE AI recommendations for 'quantity'
+                            rec["quantity"] = int(tool_match.get("quantity", 0) or 0)
                             if rec["quantity"] > 0:
                                 rec["signal"] = "BUY"
+                            elif rec["signal"] == "HOLD" and tool_match.get("signal") == "ACCUMULATE":
+                                rec["signal"] = "ACCUMULATE"
+
                         consolidated[t_norm] = rec
                 
                 # Add tool-only tickers that AI might have missed
                 for t_norm, tool_order in tool_map_norm.items():
                     if t_norm not in consolidated:
+                        tool_order["reason"] = tool_order.get("reason", "Mathematical rebalance hit target.")
                         consolidated[t_norm] = tool_order
 
                 # 4. UNIVERSAL COVERAGE: Ensure every ticker in the universe is present
@@ -521,7 +546,22 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
                         })
                 
                 print(f"DEBUG: Final consolidated trade list size: {len(final_trade_list)}")
-                status = save_draft_proposal(final_trade_list, plan_text, merge=(specific_tickers is not None))
+                
+                # --- APPLY USER RULES ---
+                # 1. Full Analysis: Contains ALL tickers (for Dashboard UI)
+                full_analysis_list = final_trade_list
+                
+                # 2. Execution Orders: Only Qty > 0 (for Order Pusher)
+                execution_orders = [o for o in final_trade_list if o.get("quantity", 0) > 0]
+                
+                print(f"DEBUG: Active Orders: {len(execution_orders)}")
+                
+                status = save_draft_proposal(
+                    orders=execution_orders, 
+                    audit_trail=plan_text, 
+                    merge=(specific_tickers is not None),
+                    full_analysis=full_analysis_list
+                )
                 print(f"DEBUG: Firestore save status: {status}")
                 logger.info(f"\n--- PROPOSAL STATUS: {status} ---\n")
                 

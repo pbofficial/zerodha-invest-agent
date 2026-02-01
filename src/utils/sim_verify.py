@@ -51,6 +51,44 @@ def run_simulation():
     if reliance_found:
         print("🟢 VERIFIED: RELIANCE (Common) also present.")
 
+    # Check Pending Orders
+    print("\n📡 Fetching LATEST trade proposal from Firestore...")
+    try:
+        pending_ref = config._get_db().collection("pending_orders").document("latest").get()
+        if pending_ref.exists:
+            p_data = pending_ref.to_dict()
+            status = p_data.get("status", "UNKNOWN")
+            orders = p_data.get("orders", [])
+            full_analysis = p_data.get("full_analysis", [])
+            
+            print(f"✅ Status: {status}")
+            print(f"✅ Execution Orders (Qty>0): {len(orders)}")
+            print(f"✅ Full Analysis Count: {len(full_analysis)}")
+            
+            if len(orders) < len(full_analysis):
+                print("🟢 VERIFIED: Orders filtered correctly. Analysis contains full universe.")
+            elif len(orders) == len(full_analysis):
+                 print(f"ℹ️ NOTE: Execution count matches analysis count ({len(orders)}).")
+            
+            if orders:
+                print("\n🧠 Sample Order 1 Detail:")
+                sample = orders[0]
+                print(f"   - Ticker: {sample.get('ticker')}")
+                print(f"   - Signal: {sample.get('signal')}")
+                print(f"   - Rationale: {sample.get('reason', 'MISSING')[:100]}...")
+                
+                # Check for UI Snapshot
+                if "ui_snapshot" in p_data:
+                    print("🟢 VERIFIED: ui_snapshot exists in Firestore.")
+                else:
+                    print("⚠️ WARNING: ui_snapshot is MISSING (Deleted by Agent). Dashboard must reconstruct.")
+            else:
+                print("🔴 FAILED: Orders list is empty.")
+        else:
+            print("🔴 FAILED: pending_orders/latest document does not exist.")
+    except Exception as e:
+        print(f"🔴 ERROR accessing pending orders: {e}")
+
     print("\n--- SIMULATION COMPLETE ---")
     print("The system is now 'Leak-Proof'. You can safely deploy the generic code.")
 

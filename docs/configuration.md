@@ -1,8 +1,13 @@
 # Configuration Guide
 
-The agent's behavior is governed by two JSON files located in `src/config/`. For ease of use, you can copy the `*.example` files to get started.
+The agent's behavior is governed by dynamic configuration stored in **Google Cloud Firestore**. While local JSON files in `src/config/` serve as templates and fallbacks, your "Source of Truth" lives in the cloud for maximum security and ease of management.
 
-## 1. `agent_config.json`
+## 0. Cloud-First Management 🛰️
+Once deployed, you can manage your settings directly via the **Dashboard -> ⚙️ Config** tab. Changes made there are instantly persisted to Firestore and picked up by the Agent's next run.
+
+---
+
+## 1. `agent_config.json` (Template)
 Controls the agent's mindset, financial budget, and high-level strategy.
 
 | Field | Type | Description |
@@ -50,10 +55,10 @@ While the files above control the *strategy*, the *security* is handled via GCP 
 | `KITE_API_KEY` | Your Zerodha API Key. |
 | `KITE_API_SECRET` | Your Zerodha API Secret. |
 | `KITE_ACCESS_TOKEN` | Your daily Zerodha Access Token. |
-| `GMAIL_USER` | The email address used to send market reports. |
-| `GMAIL_APP_PASSWORD` | 16-character Google App Password. [Generate here](https://support.google.com/accounts/answer/185833). |
-| `ALLOWED_USER_ID` | **Your Zerodha User ID** (e.g., AB1234). Used to lock the dashboard to your session. |
-| `RECIPIENT_EMAIL` | The target email address for trade reports. |
+| `GMAIL_USER` | The email address used to send market reports (must be a @gmail.com or Workspace account). |
+| `GMAIL_APP_PASSWORD` | 16-character Google App Password. [Generate here](https://support.google.com/accounts/answer/185833). **Crucial**: Standard passwords will not work. |
+| `ALLOWED_USER_ID` | **Your Zerodha User ID** (e.g., `AB1234`). This is required for session validation and ensures only your account can use the pinned tokens. |
+| `RECIPIENT_EMAIL` | The target email address for trade reports and rebalance alerts. |
 
 ---
 

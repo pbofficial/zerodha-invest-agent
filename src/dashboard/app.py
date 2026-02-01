@@ -633,7 +633,8 @@ elif st.session_state["active_tab"] == "🎯 Trading Desk":
         # 1. Check for UI Snapshot (Maintained state)
         ui_snapshot = pending_data.get("ui_snapshot")
         
-        if ui_snapshot:
+        if ui_snapshot and not status == "DRAFT": 
+            # Only use snapshot if NOT in active draft mode (to allow fresh load)
             desk_df = pd.DataFrame(ui_snapshot)
             # Ensure LTP remains live for accuracy, but all other columns stay as snapped
             for idx, row in desk_df.iterrows():
@@ -643,7 +644,9 @@ elif st.session_state["active_tab"] == "🎯 Trading Desk":
                     desk_df.at[idx, "Est. Cost (₹)"] = row["Buy Qty"] * live_prices[t]
         else:
             # Reconstruct from Assets + Analysis (Fallback/Initial)
-            draft_orders = pending_data.get("orders", [])
+            # PRIORITY: Use 'full_analysis' (Complete AI view), else 'orders' (Execution view)
+            draft_orders = pending_data.get("full_analysis") or pending_data.get("orders", [])
+            
             def normalize_t(t): return t.split(":")[-1].upper() if ":" in t else t.upper()
             draft_map = {normalize_t(o["ticker"]): o for o in draft_orders if "ticker" in o}
 
@@ -865,7 +868,7 @@ elif st.session_state["active_tab"] == "🎯 Trading Desk":
                         st.rerun()
                 with col_clr:
                     if st.button("🛑 Clear Workspace", use_container_width=True):
-                        pending_ref.update({"orders": [], "ui_snapshot": firestore.DELETE_FIELD})
+                        pending_ref.update({"orders": []}) # Keep ui_snapshot for reference
                         st.rerun()
 
             elif status == "QUEUED":
@@ -1048,9 +1051,9 @@ elif st.session_state["active_tab"] == "⚙️ Config":
                 db.collection("config").document("agent_settings").set(new_agent_config)
                 db.collection("config").document("universe").set({"assets": new_assets})
                 
-                # Clear UI cache for calculations
+                # Update status but PRESERVE snapshot
                 pending_ref = db.collection("pending_orders").document("latest")
-                pending_ref.update({"ui_snapshot": firestore.DELETE_FIELD, "status": "DRAFT"})
+                pending_ref.update({"status": "DRAFT"})
 
                 st.success("✅ Cloud Configuration Updated! Changes will take effect in the next Agent run.")
                 st.balloons()
