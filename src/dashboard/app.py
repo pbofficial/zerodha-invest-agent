@@ -351,23 +351,15 @@ universe_ref = db.collection("config").document("universe") if db else None
 handle_remote_actions()
 
 def load_universe():
-    local_path = os.path.join(project_root, "src", "config", "universe.json")
-    try:
-        with open(local_path, "r") as f: local_data = json.load(f)
-    except: local_data = {"assets": [], "settings": {}}
-    if universe_ref:
-        try:
-            doc = universe_ref.get()
-            if doc.exists: return doc.to_dict()
-        except: pass
-    return local_data
+    """Uses the Unified Cloud Loader for all data fetch."""
+    from src.utils.config_loader import config as cloud_config
+    return cloud_config.get_universe(force_refresh=True)
 
 def save_universe(data):
+    """Saves universe data directly to Cloud Firestore."""
     if universe_ref:
         try: universe_ref.set(data)
         except: pass
-    local_path = os.path.join(project_root, "src", "config", "universe.json")
-    with open(local_path, "w") as f: json.dump(data, f, indent=4)
 
 def paginate_dataframe(df, key, items_per_page=10):
     if df.empty: return df, 1, 1
@@ -963,50 +955,50 @@ elif st.session_state["active_tab"] == "🧠 AI Insights":
         except: pass
 
 elif st.session_state["active_tab"] == "⚙️ Config":
-    st.subheader("⚙️ Dynamic Strategy Configuration")
-    st.info("Edit your 'Source of Truth' here. Changes are saved to Cloud Firestore and picked up by the Agent automatically.")
+    st.subheader("⚙️ Dynamic Strategy & AI Configuration")
+    st.info("Manage your 'Source of Truth' in the Cloud. Changes are saved to Firestore and picked up by the Agent immediately.")
     
-    # 1. Load Current Strategy (Firestore -> File Fallback)
-    strat_ref = db.collection("config").document("universe")
+    from src.utils.config_loader import config as cloud_config
+    
     try:
-        strat_doc = strat_ref.get()
-    
-        current_assets = []
-        source = "Local Default"
+        # Load Data from Unified Loader
+        agent_data = cloud_config.get_agent_settings(force_refresh=True)
+        universe_data = cloud_config.get_universe(force_refresh=True)
         
-        if strat_doc.exists:
-            strat_data = strat_doc.to_dict()
-            current_assets = strat_data.get("assets", [])
-            current_settings = strat_data.get("settings", {})
-            source = "✅ Cloud Firestore"
-        else:
-            # Fallback to local file
-            univ_path = os.path.join(project_root, "src", "config", "universe.json")
-            if os.path.exists(univ_path):
-                with open(univ_path, "r") as f:
-                    u_data = json.load(f)
-                    current_assets = u_data.get("assets", [])
-                    current_settings = u_data.get("settings", {})
-            else:
-                current_assets = []
-                current_settings = {}
-            source = "📁 Local File (Not Synced)"
+        # 1. Agent settings editing
+        st.markdown("### 🤖 Agent Intelligence Settings")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            current_settings = agent_data.get("agent_settings", {})
+            new_model = st.selectbox("Model Name", 
+                                   options=["gemini-2.0-flash", "gemini-1.5-pro"], 
+                                   index=0 if current_settings.get("model_name") == "gemini-2.0-flash" else 1)
+            new_location = st.text_input("GCP Location", value=current_settings.get("location", "us-east4"))
             
-        st.caption(f"Loaded from: {source}")
-        
-        # 2. Settings & Strategy Editor
-        col_set1, col_set2 = st.columns([1, 1])
-        with col_set1:
-            new_budget = st.number_input("💰 Global Allocation Budget (₹)", min_value=1000, value=int(current_settings.get("budget", 12500)), step=500)
-        
+        with col2:
+            new_risk = st.slider("Risk Threshold (0-10)", 0, 10, int(current_settings.get("risk_threshold", 8)))
+            current_goals = agent_data.get("investment_goals", {})
+            new_budget = st.number_input("💰 Global Budget (₹)", min_value=1000, value=int(current_goals.get("budget", 12500)), step=500)
+
+        with col3:
+            current_scoring = agent_data.get("scoring_rules", {})
+            st.caption("AI Scoring Protocol")
+            s_noise = st.number_input("Noise Score (Ignore)", value=int(current_scoring.get("noise", 0)))
+            s_context = st.number_input("Context Score (Note)", value=int(current_scoring.get("context", 5)))
+            s_critical = st.number_input("Critical Score (Action)", value=int(current_scoring.get("critical", 10)))
+
         st.divider()
+        
+        # 2. Universe (Strategy) Editing
+        st.markdown("### 🎯 Investment Universe & Weights")
+        current_assets = universe_data.get("assets", [])
         strat_df = pd.DataFrame(current_assets)
         
-        # Ensure columns exist before reordering
+        # Ensure standard columns
         for col in ["ticker", "sector", "type", "cap_type", "target_weight", "target_amount"]:
             if col not in strat_df.columns: strat_df[col] = ""
 
-        # Reorder: TICKER, SECTOR, Type, Cap, Weight, Target
         strat_df = strat_df[["ticker", "sector", "type", "cap_type", "target_weight", "target_amount"]]
         
         edited_strat = st.data_editor(
@@ -1024,46 +1016,51 @@ elif st.session_state["active_tab"] == "⚙️ Config":
             key="strat_editor"
         )
         
-        # 3. Save Logic
-        if st.button("💾 Save Strategy to Cloud", type="primary"):
+        # 3. Save All Logic
+        if st.button("💾 Save All Changes to Cloud", type="primary"):
             try:
-                # Convert back to list of dicts
-                # Handle possible NaN from new rows
+                # Prepare Agent Settings
+                new_agent_config = {
+                    "agent_settings": {
+                        "model_name": new_model,
+                        "location": new_location,
+                        "risk_threshold": new_risk
+                    },
+                    "investment_goals": {
+                        "budget": new_budget,
+                        "target_portfolio": ", ".join(edited_strat["ticker"].tolist())
+                    },
+                    "scoring_rules": {
+                        "noise": s_noise,
+                        "context": s_context,
+                        "critical": s_critical
+                    }
+                }
+                
+                # Prepare Universe Data
                 edited_strat = edited_strat.fillna("") 
                 new_assets = edited_strat.to_dict(orient="records")
-                
-                # Clean numeric fields
                 for a in new_assets:
                     a["target_amount"] = int(a.get("target_amount") or 0)
                     a["target_weight"] = float(a.get("target_weight") or 0.0)
                 
-                # Save to Firestore
-                strat_ref.set({
-                    "assets": new_assets,
-                    "settings": {
-                        "budget": new_budget
-                    }
-                })
+                # Save via Utility and Direct Firestore for Universe
+                db.collection("config").document("agent_settings").set(new_agent_config)
+                db.collection("config").document("universe").set({"assets": new_assets})
                 
-                # Clear Trading Snapshot to force refresh with new budget/assets
+                # Clear UI cache for calculations
                 pending_ref = db.collection("pending_orders").document("latest")
                 pending_ref.update({"ui_snapshot": firestore.DELETE_FIELD, "status": "DRAFT"})
 
-                st.success(f"✅ Configuration updated! Budget set to ₹{new_budget:,}.")
+                st.success("✅ Cloud Configuration Updated! Changes will take effect in the next Agent run.")
                 st.balloons()
-                time.sleep(1) # Brief pause for UX
+                time.sleep(1)
                 st.rerun()
-                
-                # Simple validation check
-                total_w = sum([a["target_weight"] for a in new_assets])
-                if not 0.98 <= total_w <= 1.02:
-                    st.warning(f"⚠️ Note: Total weight is {total_w:.2f}. Ideally it should sum to 1.0.")
-                    
             except Exception as e:
                 st.error(f"Save failed: {e}")
-                
+
     except Exception as e:
-        st.error(f"Config Error: {e}")
+        st.error(f"Configuration Hub Error: {e}")
 
 st.divider()
 st.caption("Zerodha Invest Agent v4.1 | Phase 2: AI Advisor & Draft Workflow")

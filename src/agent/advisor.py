@@ -16,16 +16,15 @@ class InvestmentAdvisor:
         from src.utils.project import get_project_id
         self.project_id = get_project_id()
         
-        # Load Config
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(current_dir, "..", "config", "agent_config.json")
+        # Load Config via Unified Cloud Loader
+        from src.utils.config_loader import config as cloud_config
         try:
-            with open(config_path, "r") as f:
-                self.config = json.load(f)
-                settings = self.config.get("agent_settings", {})
-                self.scoring = self.config.get("scoring_rules", {})
-                self.goals = self.config.get("investment_goals", {})
-        except:
+            self.config = cloud_config.get_agent_settings()
+            settings = self.config.get("agent_settings", {})
+            self.scoring = self.config.get("scoring_rules", {})
+            self.goals = self.config.get("investment_goals", {})
+        except Exception as e:
+            logger.error(f"⚠️ Advisor config load error: {e}")
             settings = {}
             self.scoring = {}
             self.goals = {}

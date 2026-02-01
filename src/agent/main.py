@@ -20,6 +20,7 @@ from src.functions.news.main import get_market_news
 from src.functions.fundamentals.main import check_financial_health
 from src.functions.allocation.main import calculate_orders
 from src.utils.llm_helpers import extract_json_from_text
+from src.utils.config_loader import config as cloud_config
 
 def main(request=None):
     """Entry point for Cloud Function."""
@@ -49,58 +50,19 @@ SYSTEM_INSTRUCTION = ""
 TARGET_PORTFOLIO_STR = ""
 
 def load_universe_config():
-    """Lazily loads configuration to avoid top-level network calls."""
-    global AGENT_CONFIG, UNIVERSE_CONFIG, SETTINGS, GOALS, SCORING, ASSETS, SYSTEM_INSTRUCTION, TARGET_PORTFOLIO_STR
+    """Unified configuration loading via Cloud Config Loader."""
+    global AGENT_CONFIG, UNIVERSE_CONFIG, SETTINGS, GOALS, SCORING, ASSETS
     
-    # Load Config (Local)
-    try:
-        config_path = os.path.join(project_root, 'src', 'config', 'agent_config.json')
-        with open(config_path, 'r') as f:
-            AGENT_CONFIG = json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load agent_config.json: {e}")
-        AGENT_CONFIG = {} 
+    # Fetch from Unified Cloud Loader
+    AGENT_CONFIG = cloud_config.get_agent_settings()
+    UNIVERSE_CONFIG = cloud_config.get_universe()
 
-    # Load Universe (Firestore with Fallback)
-    UNIVERSE_CONFIG = {"assets": []}
-    try:
-        from src.utils.project import get_project_id
-        project_id = get_project_id()
-        if project_id:
-            db = firestore.Client(project=project_id)
-            doc = db.collection("config").document("universe").get()
-            
-            if doc.exists:
-                UNIVERSE_CONFIG = doc.to_dict()
-                logger.info("Loaded Universe configuration from Firestore.")
-            else:
-                logger.warning("Universe doc not found in Firestore, falling back to local universe.json")
-                raise Exception("Firestore doc missing")
-        else:
-             raise Exception("PROJECT_ID not set")
-
-    except Exception as e:
-        logger.warning(f"Firestore load failed/skipped ({e}), falling back to local universe.json")
-        try:
-             universe_path = os.path.join(project_root, 'src', 'config', 'universe.json')
-             with open(universe_path, 'r') as f:
-                 UNIVERSE_CONFIG = json.load(f)
-        except Exception as local_e:
-             logger.error(f"Failed to load local universe.json: {local_e}")
-
-    # Prioritize Firestore Settings
     SETTINGS = AGENT_CONFIG.get("agent_settings", {})
     GOALS = AGENT_CONFIG.get("investment_goals", {})
-    
-    # Overwrite budget/settings from Firestore if present
-    universe_settings = UNIVERSE_CONFIG.get("settings", {})
-    if universe_settings:
-        if "budget" in universe_settings:
-            GOALS["budget"] = universe_settings["budget"]
-            logger.info(f"📍 Overrode budget from Firestore: {GOALS['budget']}")
-
     SCORING = AGENT_CONFIG.get("scoring_rules", {})
     ASSETS = UNIVERSE_CONFIG.get("assets", [])
+    
+    logger.info(f"📍 Configuration Synchronized. Universe: {len(ASSETS)} tickers | Budget: {GOALS.get('budget')}")
 
 def get_system_instruction(assets, settings, scoring):
     """Generates the system prompt dynamically based on the current universe."""
