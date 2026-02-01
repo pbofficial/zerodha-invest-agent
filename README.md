@@ -52,8 +52,16 @@ The system uses **GCP Secret Manager** for all sensitive credentials. You MUST c
 
 ### 3. Deployment
 Run the unified deployment script. This will provision your Cloud Functions, Firestore database, and the Streamlit Dashboard.
+
+**Windows (PowerShell):**
 ```powershell
 .\deploy.ps1 -ProjectId "your-gcp-project-id" -RecipientEmail "your@email.com"
+```
+
+**Linux / macOS (Bash):**
+```bash
+chmod +x deploy.sh
+./deploy.sh "your-gcp-project-id" "your@email.com"
 ```
 
 ### 4. Initial Load
