@@ -7,7 +7,7 @@ The Intelligent Zerodha Investment Agent is more than just a trading script; it 
 - **Sentiment & Impact Scoring**: News is scored on a scale (Noise vs. Critical). Only high-impact, material news affects investment decisions.
 - **Multimodal Reasoning**: Uses Gemini 2.0's large context window to correlate cross-sector trends (e.g., how a move in Utilities might affect your Industrial holdings).
 
-## 📊 Dynamic Portfolio Portfolio
+## 📊 Dynamic Portfolio Workspace
 - **Trading Workspace**: A live, editable GUI to review AI suggestions.
 - **Manual Overrides**: Humans have the final word. Adjust quantities or dismiss suggestions before execution.
 - **Snapshot Persistence**: Once trades are queued, the UI captures a complete snapshot of the "Why" (LTP, Rationale, Signal) so you always know what you approved.
@@ -18,7 +18,7 @@ The Intelligent Zerodha Investment Agent is more than just a trading script; it 
 - **Hardened Cancellation**: Explicit controls to clear queued orders and reset to a clean draft state.
 
 ## 📈 Analytics & Insights
-- **AI Logic Stream**: View the raw thinking process of the agent for setiap stock.
+- **AI Logic Stream**: View the raw thinking process of the agent for each stock.
 - **Executive Summaries**: AI-generated summaries of complex research runs to save you time.
 - **Sector/Cap Mixed Distribution**: Real-time visualization of your portfolio's diversity.
 

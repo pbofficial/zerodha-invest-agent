@@ -59,9 +59,9 @@ The following secrets must be created in Google Secret Manager:
 - `KITE_API_SECRET`
 - `KITE_ACCESS_TOKEN`
 - `GMAIL_USER` (Sender email for notifications)
-- `GMAIL_APP_PASSWORD` (App password for Gmail SMTP)
+- `GMAIL_APP_PASSWORD` (App password for Gmail SMTP. [How to generate](https://support.google.com/accounts/answer/185833))
 - `RECIPIENT_EMAIL` (Target email for trade reports)
-- `ALLOWED_USER_ID` (For dashboard authentication)
+- `ALLOWED_USER_ID` (Your Zerodha User ID - used to restrict dashboard access)
 
 ### 4. Deployment
 Run the deployment script for your environment:
