@@ -1,0 +1,13 @@
+
+.git
+.terraform
+.venv
+terraform/
+test_zip/
+brain/
+.agent/
+tests/
+__pycache__/
+*.zip
+*.ps1
+deploy.sh

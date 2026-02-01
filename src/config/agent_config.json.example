@@ -1,0 +1,16 @@
+{
+    "agent_settings": {
+        "model_name": "gemini-2.0-flash",
+        "location": "us-east4",
+        "risk_threshold": 8
+    },
+    "investment_goals": {
+        "budget": 10000,
+        "target_portfolio": "RELIANCE, HDFCBANK, INFOSYS"
+    },
+    "scoring_rules": {
+        "noise": 0,
+        "context": 5,
+        "critical": 10
+    }
+}

@@ -1,0 +1,111 @@
+# --- Terraform ---
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files (CRITICAL: Never commit these. They contain secrets.)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# .tfvars files (Contains your local secrets/keys)
+*.tfvars
+*.tfvars.json
+
+# Crash logs
+crash.log
+override.tf
+override.tf.json
+.terraformrc
+terraform.rc
+
+# --- Python ---
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.vscode/settings.json
+
+# Virtual Environments
+venv/
+env/
+.venv/
+
+# Distribution / Packaging
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
+*.egg-info/
+
+# Unit Test / Coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- GCP / Local Secrets ---
+# Service account keys
+*.json
+key.json
+gcp-key.json
+
+# Environment variables
+.env
+.env.local
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm / JetBrains
+.idea/
+
+# Abstra
+.abstra/
+
+# Visual Studio Code
+.vscode/
+
+# Ruff stuff:
+.ruff_cache/
+
+# PyPI configuration file
+.pypirc
+
+# Cursor
+.cursorignore
+.cursorindexingignore
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+# OS
+.DS_Store
+
+# Archives
+*.zip
+*.tar.gz
+*.7z

@@ -1,0 +1,16 @@
+{
+    "settings": {
+        "max_sector_cap": 0.35,
+        "max_single_stock_cap": 0.15
+    },
+    "assets": [
+        {
+            "ticker": "RELIANCE",
+            "type": "Core",
+            "sector": "Energy",
+            "cap_type": "Large",
+            "target_amount": 50000,
+            "target_weight": 0.20
+        }
+    ]
+}

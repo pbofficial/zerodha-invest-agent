@@ -1,0 +1,5 @@
+kiteconnect
+tenacity
+pandas_market_calendars
+pytz
+pandas

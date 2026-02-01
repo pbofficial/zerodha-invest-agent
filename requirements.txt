@@ -1,0 +1,14 @@
+google-cloud-aiplatform
+kiteconnect
+duckduckgo-search
+requests
+yfinance
+pandas
+pandas_market_calendars
+tenacity
+pytest
+pytz
+streamlit
+google-cloud-firestore
+google-cloud-secret-manager
+google-cloud-resource-manager
