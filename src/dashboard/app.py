@@ -439,6 +439,20 @@ with st.sidebar:
         st.success("Cache Cleared!")
         st.rerun()
     st.divider()
+    with st.expander("📖 Quick Help"):
+        st.markdown("""
+        **How to use?**
+        1. **Portfolio**: Monitor your current stocks and risk.
+        2. **Trading Desk**: 
+           - Click **Run Analysis** to let AI suggest trades.
+           - Edit **Buy Qty** to override AI.
+           - Click **Submit** to queue orders.
+        3. **AI Insights**: Chat with the agent about your holdings.
+        4. **Config**: Change symbols or budget.
+        
+        [Full User Guide](https://github.com/pbofficial/zerodha-invest-agent/blob/main/docs/USER_GUIDE.md)
+        """)
+    st.divider()
 
 st.caption(f"Logged in as: {st.session_state.get('user_id', 'User')} | ✅ Connected to Kite")
 
@@ -718,7 +732,7 @@ elif st.session_state["active_tab"] == "🎯 Trading Desk":
             invest_amt = st.number_input("💰 Allocation Budget (₹)", min_value=1000.0, value=float(default_budget), step=500.0)
 
             # --- Action Bar ---
-            if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
+            if st.button("🚀 Run Analysis", type="primary", use_container_width=True, help="Triggers AI research on news, financials, and technicals to propose a rebalanced portfolio."):
                 if "desk_edits" in st.session_state: del st.session_state["desk_edits"]
                 # DO NOT clear orders here! Keep current queue visible until fresh analysis completes.
                 pending_ref.update({
@@ -836,7 +850,7 @@ elif st.session_state["active_tab"] == "🎯 Trading Desk":
             if status == "DRAFT":
                 col_sub, col_clr = st.columns([1, 1])
                 with col_sub:
-                    if st.button("📤 Submit for Approval", type="primary", use_container_width=True, disabled=(total_buy_cost == 0)):
+                    if st.button("📤 Submit for Approval", type="primary", use_container_width=True, disabled=(total_buy_cost == 0), help="Queues these orders for execution. Requires human approval via email or 'Approve Now' button."):
                         # 1. Save state
                         final_orders = []
                         for _, row in edited_df.iterrows():
