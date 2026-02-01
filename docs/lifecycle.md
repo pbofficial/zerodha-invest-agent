@@ -29,9 +29,11 @@ sequenceDiagram
     U->>D: Click "Confirm & Queue trades"
 
     Note over S,K: Phase 4: Execution
-    S->>K: Trigger "Order Pusher" (Optional, e.g. 11:00 AM)
-    OR
-    U->>D: Click "Execute Trades Now"
+    alt Scheduled Execution
+        S->>K: Trigger "Order Pusher" (Optional, e.g. 11:00 AM)
+    else Manual Execution
+        U->>D: Click "Execute Trades Now"
+    end
     K->>U: Zerodha Order Notification
 ```
 
