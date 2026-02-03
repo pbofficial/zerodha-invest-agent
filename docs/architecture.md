@@ -60,3 +60,22 @@ graph TD
 6. Agent calculates suggested quantities based on the global budget.
 7. Agent saves a comprehensive Research Report to Firestore.
 8. Dashboard refreshes to show refined AI Signals and Insights.
+
+## The Paradigm Shift: From API Management to AI Management
+
+As of Phase 2, this architecture evolves from traditional REST integration to **AI Management via APIs**. 
+
+### 1. Model Context Protocol (MCP) as the Abstraction Layer
+By using Apigee as an **MCP Gateway**, we decouple the "Brain" from the specific "Hands". 
+- **The LLM** sees a stable set of capabilities (Tools).
+- **Apigee** manages the lifecycle, discovery (via API Hub), and governance of these tools.
+- **The Broker (Zerodha)** is abstracted away. Switching brokers in the future requires zero changes to the AI's reasoning logic.
+
+### 2. Generative AI Policies (LLM Snaps)
+We transition from basic rate limiting to **AI Governance**:
+- **Prompt Sanitization**: Using Model Armor to prevent adversarial prompts.
+- **Semantic Caching**: Reducing latency and cost by caching common financial queries.
+- **Token Quotas**: managing "AI Spend" at the gateway level rather than inside the application code.
+
+> [!NOTE]
+> This transition marks the move from "building an app with AI" to "building an autonomous AI-driven enterprise service."

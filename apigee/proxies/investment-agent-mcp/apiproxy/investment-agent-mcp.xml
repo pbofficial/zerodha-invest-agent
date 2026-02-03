@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<APIProxy revision="1" name="investment-agent-mcp">
+    <Basepaths>/v1/investment-mcp</Basepaths>
+    <ConfigurationVersion>
+        <MajorVersion>4</MajorVersion>
+        <MinorVersion>0</MinorVersion>
+    </ConfigurationVersion>
+    <CreatedAt>1706970000000</CreatedAt>
+    <Description>MCP Gateway for Investment Agent Tools</Description>
+    <DisplayName>investment-agent-mcp</DisplayName>
+    <LastModifiedAt>1706970000000</LastModifiedAt>
+    <Proxies>
+        <Proxy>default</Proxy>
+    </Proxies>
+    <Policies>
+        <Policy>MapFunctionNames</Policy>
+    </Policies>
+    <Resources>
+        <Resource>openapi://investment_tools.yaml</Resource>
+        <Resource>jsc://map_paths.js</Resource>
+    </Resources>
+    <Targets>
+        <Target>get-portfolio</Target>
+        <Target>calculate-allocations</Target>
+        <Target>check-financial-health</Target>
+        <Target>get-market-news</Target>
+    </Targets>
+</APIProxy>

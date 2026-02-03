@@ -1,5 +1,7 @@
 resource "google_project_service" "apis" {
   for_each = toset([
+    "apigee.googleapis.com",
+    "apihub.googleapis.com",
     "artifactregistry.googleapis.com",
     "cloudfunctions.googleapis.com",
     "run.googleapis.com",
@@ -9,7 +11,8 @@ resource "google_project_service" "apis" {
     "cloudscheduler.googleapis.com",
     "cloudbuild.googleapis.com",
     "vpcaccess.googleapis.com",
-    "compute.googleapis.com"
+    "compute.googleapis.com",
+    "cloudresourcemanager.googleapis.com"
   ])
 
   project = var.project_id

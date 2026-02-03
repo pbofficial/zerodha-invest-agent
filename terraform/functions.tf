@@ -290,10 +290,145 @@ resource "google_cloudfunctions2_function" "morning_execution" {
   ]
 }
 
+# Cloud Function: check-financial-health
+resource "google_cloudfunctions2_function" "check_financial_health" {
+  name        = "check-financial-health"
+  location    = var.region
+  project     = var.project_id
+  description = "Checks quarterly profit trends for a ticker"
+
+  build_config {
+    runtime     = "python311"
+    entry_point = "main"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.function_source.name
+        object = google_storage_bucket_object.function_archive.name
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count = 1
+    available_memory   = "512Mi"
+    available_cpu      = "0.5"
+    timeout_seconds    = 60
+    
+    vpc_connector = google_vpc_access_connector.connector.id
+    
+    environment_variables = {
+      PROJECT_ID = var.project_id
+      LOCATION   = var.region
+    }
+  }
+  
+  depends_on = [google_project_service.apis]
+}
+
+# Cloud Function: get-market-news
+resource "google_cloudfunctions2_function" "get_market_news" {
+  name        = "get-market-news"
+  location    = var.region
+  project     = var.project_id
+  description = "Fetches recent negative financial news via DDG"
+
+  build_config {
+    runtime     = "python311"
+    entry_point = "main"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.function_source.name
+        object = google_storage_bucket_object.function_archive.name
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count = 1
+    available_memory   = "512Mi"
+    available_cpu      = "0.5"
+    timeout_seconds    = 60
+    
+    vpc_connector = google_vpc_access_connector.connector.id
+    
+    environment_variables = {
+      PROJECT_ID = var.project_id
+      LOCATION   = var.region
+    }
+  }
+  
+  depends_on = [google_project_service.apis]
+}
+
 resource "google_cloud_run_service_iam_member" "invoker_execute_trade" {
   location = google_cloudfunctions2_function.execute_trade.location
   project  = google_cloudfunctions2_function.execute_trade.project
   service  = google_cloudfunctions2_function.execute_trade.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
+}
+
+# Apigee Service Agent Invoker Permissions
+resource "google_cloud_run_service_iam_member" "apigee_invoker_get_portfolio" {
+  location = google_cloudfunctions2_function.get_portfolio.location
+  project  = google_cloudfunctions2_function.get_portfolio.project
+  service  = google_cloudfunctions2_function.get_portfolio.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-apigee.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_service_iam_member" "apigee_invoker_calculate_allocations" {
+  location = google_cloudfunctions2_function.calculate_allocations.location
+  project  = google_cloudfunctions2_function.calculate_allocations.project
+  service  = google_cloudfunctions2_function.calculate_allocations.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-apigee.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_service_iam_member" "apigee_invoker_check_health" {
+  location = google_cloudfunctions2_function.check_financial_health.location
+  project  = google_cloudfunctions2_function.check_financial_health.project
+  service  = google_cloudfunctions2_function.check_financial_health.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-apigee.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_service_iam_member" "apigee_invoker_market_news" {
+  location = google_cloudfunctions2_function.get_market_news.location
+  project  = google_cloudfunctions2_function.get_market_news.project
+  service  = google_cloudfunctions2_function.get_market_news.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-apigee.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_service_iam_member" "invoker_get_portfolio" {
+  location = google_cloudfunctions2_function.get_portfolio.location
+  project  = google_cloudfunctions2_function.get_portfolio.project
+  service  = google_cloudfunctions2_function.get_portfolio.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
+}
+
+resource "google_cloud_run_service_iam_member" "invoker_calculate_allocations" {
+  location = google_cloudfunctions2_function.calculate_allocations.location
+  project  = google_cloudfunctions2_function.calculate_allocations.project
+  service  = google_cloudfunctions2_function.calculate_allocations.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
+}
+
+resource "google_cloud_run_service_iam_member" "invoker_check_health" {
+  location = google_cloudfunctions2_function.check_financial_health.location
+  project  = google_cloudfunctions2_function.check_financial_health.project
+  service  = google_cloudfunctions2_function.check_financial_health.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
+}
+
+resource "google_cloud_run_service_iam_member" "invoker_market_news" {
+  location = google_cloudfunctions2_function.get_market_news.location
+  project  = google_cloudfunctions2_function.get_market_news.project
+  service  = google_cloudfunctions2_function.get_market_news.name
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
 }

@@ -1,0 +1,47 @@
+/*
+# Apigee Proxy for MCP & GenAI Policies
+
+# This file assumes an existing Apigee Organization and Environment.
+# It defines the proxy metadata and the "LLM Snaps" (Generative AI Policies).
+
+resource "google_apigee_api_proxy" "mcp_proxy" {
+  provider         = google-beta
+  name             = "investment-agent-mcp"
+  bundle           = "${path.module}/../apigee/proxies/investment-agent-mcp.zip"
+  bundle_hash      = filebase64sha256("${path.module}/../apigee/proxies/investment-agent-mcp.zip")
+}
+
+# Example of what the GenerativeAI policy looks like (Conceptual for Proxy Config)
+/*
+<GenerativeAI name="Guardrails">
+    <DisplayName>Apply Model Armor</DisplayName>
+    <PromptOverride>Verify the safety of this financial analysis request.</PromptOverride>
+    <Model>
+        <Source>VertexAI</Source>
+        <ModelName>gemini-1.5-pro</ModelName>
+    </Model>
+</GenerativeAI>
+*/
+
+# Registering the proxy in the Environment
+resource "google_apigee_environment_proxy_revision" "mcp_deployment" {
+  provider = google-beta
+  org_id   = var.project_id # For eval/pay-as-you-go, Org ID usually matches Project ID
+  env_name = "eval"
+  proxy_id = google_apigee_proxy.mcp_proxy.name
+  revision = "1"
+}
+
+# Add API Hub integration (Linking Proxy to API Hub)
+resource "google_apihub_deployment" "investment_deployment" {
+  provider      = google-beta
+  deployment_id = "mcp-gateway-deployment"
+  project       = var.project_id
+  location      = var.region
+  api_id        = "investment-tools-api"
+  version_id    = "v1"
+  
+  display_name = "Apigee MCP Gateway"
+  access_url    = ["https://api.enterprise.com/v1/investment-mcp"]
+}
+*/

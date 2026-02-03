@@ -1,0 +1,217 @@
+openapi: 3.1.0
+info:
+  title: Zerodha Invest Agent Tools
+  description: A set of tools for financial market analysis, allocation, and order calculation.
+  version: 1.0.0
+servers:
+  - url: https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net
+    description: GCP Cloud Functions server
+
+paths:
+  /get_market_snapshot:
+    post:
+      summary: Get live market prices and user holdings
+      description: |
+        CRITICAL: Use this as the first step for ANY portfolio analysis. 
+        It returns current market prices (LTP) and the user's current holdings. 
+        - Use this to check 'gap' between target and actual.
+        - Use this to verify a ticker exists before performing further analysis.
+        - Thinking: "Before I advise, I must know what the user owns and its current market value."
+      operationId: get_market_snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tickers:
+                  type: array
+                  items:
+                    type: string
+                  description: NSE symbols, uppercase (e.g., "TCS", "INFY"). Use ["ALL"] to get full portfolio.
+              required:
+                - tickers
+            example:
+              tickers: ["HDFCBANK", "RELIANCE", "TCS"]
+      responses:
+        '200':
+          description: Market snapshot data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prices:
+                    type: object
+                    additionalProperties:
+                      type: number
+                  holdings:
+                    type: array
+                    items:
+                      type: object
+                  metadata:
+                    type: object
+                  alerts:
+                    type: object
+              example:
+                prices: {"HDFCBANK": 1650.5, "RELIANCE": 2540.2}
+                holdings: [{"tradingsymbol": "HDFCBANK", "quantity": 10, "average_price": 1600.0}]
+
+  /check_financial_health:
+    post:
+      summary: Audit stock for profit declines (Cynical Check)
+      description: |
+        Performs a 'Fundamental Red Flag' check. Analyzes quarterly profit trends. 
+        Returns 'WARNING' if profits have dropped for 2 consecutive quarters. 
+        - Thinking: "Numerical growth is the only truth. If profits drop, I must caution the investor regardless of news sentiment."
+        - Recommendation: Call this for every stock in a BUY suggestion list.
+      operationId: check_financial_health
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ticker:
+                  type: string
+                  description: NSE Ticker symbol.
+              required:
+                - ticker
+            example:
+              ticker: "HDFCBANK"
+      responses:
+        '200':
+          description: Health check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [OK, WARNING]
+                  reason:
+                    type: string
+              example:
+                status: "OK"
+                reason: "Consistent profit growth"
+
+  /calculate_orders:
+    post:
+      summary: Finalize trade quantities based on budget
+      description: |
+        Mathematical engine to convert 'Target Allocations' into 'Order Quantities'.
+        - Use this ONLY after you have decided WHICH stocks to buy.
+        - It assumes a fixed budget and attempts to optimize lot sizes based on current LTP.
+        - Thinking: "I know what I want. This tool tells me exactly HOW MUCH I can afford."
+      operationId: calculate_orders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                budget:
+                  type: number
+                  description: Total cash available for this rebalance session.
+                portfolio:
+                  type: array
+                  items:
+                    type: object
+                  description: The current holdings list (returned by get_market_snapshot).
+                prices:
+                  type: object
+                  description: Current LTP map (returned by get_market_snapshot).
+                targets:
+                  type: object
+                  description: Map of Ticker -> % Target (e.g. {"RELIANCE": 0.2}).
+                target_amounts:
+                  type: object
+                  description: Optional map for specific fixed amount allocations.
+              required:
+                - budget
+                - portfolio
+                - prices
+                - targets
+            example:
+              budget: 50000
+              portfolio: []
+              prices: {"HDFCBANK": 1650.0}
+              targets: {"HDFCBANK": 0.5}
+      responses:
+        '200':
+          description: List of suggested orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ticker:
+                      type: string
+                    signal:
+                      type: string
+                    reason:
+                      type: string
+                    quantity:
+                      type: integer
+                    price:
+                      type: number
+              example:
+                - ticker: "HDFCBANK"
+                  signal: "BUY"
+                  reason: "Underweight"
+                  quantity: 15
+                  price: 1650.0
+
+  /get_market_news:
+    post:
+      summary: Scour the web for regulatory or fraud risks
+      description: |
+        Fetches 'Cynical' news. Focuses on fraud, management exits, and regulatory penalties.
+        - Thinking: "I must look for reasons NOT to invest. Negative sentiment here overrides fundamental health."
+        - Call this BEFORE finalized order calculation.
+      operationId: get_market_news
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tickers:
+                  type: array
+                  items:
+                    type: string
+                  description: List of ticker symbols to audit.
+              required:
+                - tickers
+            example:
+              tickers: ["HDFCBANK", "ZOMATO"]
+      responses:
+        '200':
+          description: News data organized by ticker
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      snippet:
+                        type: string
+                      url:
+                        type: string
+              example:
+                HDFCBANK: 
+                  - title: "HDFC Bank Q3 Results"
+                    snippet: "Profits up 10% YoY..."
+                    url: "https://news.com/hdfc"
