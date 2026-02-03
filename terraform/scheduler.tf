@@ -20,7 +20,7 @@ resource "google_cloud_scheduler_job" "daily_nudge" {
 resource "google_cloud_scheduler_job" "morning_execution_job" {
   name             = "morning-execution"
   description      = "Executes queued orders when market opens"
-  schedule         = "15 9 * * 1-5" # Mon-Fri at 9:15 AM IST
+  schedule         = "30 9 * * 1-5" # Mon-Fri at 9:30 AM IST
   time_zone        = "Asia/Kolkata"
   attempt_deadline = "180s"
 

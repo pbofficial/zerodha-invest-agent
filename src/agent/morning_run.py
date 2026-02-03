@@ -12,6 +12,7 @@ sys.path.append(project_root)
 
 from src.functions.market_data.main import is_market_open
 from src.utils.secrets import get_secret
+from src.utils.notifications import NotificationManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MorningRun")
@@ -91,10 +92,21 @@ def run_morning_execution(request=None, dry_run=False, force=False, api_key_over
         try:
             profile = it.profile()
             logger.info(f"👤 Session Validated: Connected as {profile.get('user_name')} ({profile.get('user_id')})")
+            
+            # --- FUND VALIDATION ---
+            margins = it.margins()
+            cash = margins.get("equity", {}).get("net", 0)
+            logger.info(f"💰 Available Cash: ₹{cash}")
+            
+            # If we're not in dry run, and cash is 0, we should probably stop or at least warn loudly
+            if cash <= 0 and not dry_run:
+                logger.error("🛑 ZERO FUNDS AVAILABLE. Aborting execution to avoid system errors.")
+                return "Insufficient Funds", 400
+
         except Exception as e:
-            logger.error(f"🚫 Session Validation Failed: {e}")
-            logger.error("The Access Token may be expired or mismatched with this API Key.")
-            return "Auth Failure", 401
+            logger.error(f"🚫 Session/Fund Validation Failed: {e}")
+            logger.error("The Access Token may be expired or the API is unresponsive.")
+            return "Auth/Fund Failure", 401
 
     execution_results = []
     logger.info(f"{'🧪 DRY RUN' if dry_run else '🚀'} Found {len(orders)} orders. Processing...")
@@ -109,23 +121,74 @@ def run_morning_execution(request=None, dry_run=False, force=False, api_key_over
                 execution_results.append({"ticker": ticker, "quantity": qty, "status": "DRY_SUCCESS"})
             else:
                 logger.info(f"⚡ Placing Order: BUY {qty} {ticker} (CNC/MARKET)")
-                order_id = it.place_order(
-                    variety="regular", 
-                    exchange="NSE", 
-                    tradingsymbol=ticker, 
-                    transaction_type="BUY", 
-                    quantity=qty, 
-                    product="CNC", 
-                    order_type="MARKET"
-                )
-                logger.info(f"✅ Order Placed: {order_id}")
-                execution_results.append({"ticker": ticker, "quantity": qty, "status": "SUCCESS", "order_id": order_id})
+                
+                # --- DETAILED AUDIT LOGGING (REQUEST) ---
+                params = {
+                    "variety": "regular", 
+                    "exchange": "NSE", 
+                    "tradingsymbol": ticker, 
+                    "transaction_type": "BUY", 
+                    "quantity": qty, 
+                    "product": "CNC", 
+                    "order_type": "MARKET"
+                }
+                logger.info(f"📡 API REQUEST [place_order]: {json.dumps(params)}")
+                
+                try:
+                    order_id = it.place_order(**params)
+                    logger.info(f"✅ Order Placed: {order_id}")
+                    execution_results.append({"ticker": ticker, "quantity": qty, "status": "PLACED", "order_id": order_id})
+                except Exception as api_err:
+                    # Capture raw response if possible (KiteConnect exceptions often have .message)
+                    logger.error(f"❌ API RESPONSE [ERROR]: {api_err}")
+                    execution_results.append({"ticker": ticker, "quantity": qty, "status": "FAILED", "error": str(api_err)})
+                
                 time.sleep(0.5) 
         except Exception as e:
-            logger.error(f"❌ Failed to execute {ticker}: {e}")
-            execution_results.append({"ticker": ticker, "quantity": qty, "status": "FAILED", "error": str(e)})
+            logger.error(f"❌ unexpected error executing {ticker}: {e}")
+            execution_results.append({"ticker": ticker, "quantity": qty, "status": "ERROR", "error": str(e)})
 
-    # --- State Cleanup & Archiving ---
+    # --- ORDER VERIFICATION LOOP ---
+    if not dry_run and execution_results:
+        logger.info("⏳ Waiting 10 seconds for order processing...")
+        time.sleep(10)
+        
+        try:
+            orders_book = it.orders()
+            orders_map = {o['order_id']: o for o in orders_book}
+            
+            for res in execution_results:
+                oid = res.get("order_id")
+                if oid and oid in orders_map:
+                    kite_order = orders_map[oid]
+                    res["status"] = kite_order.get("status") # COMPLETE, REJECTED, etc.
+                    res["reason"] = kite_order.get("status_message")
+                    if res["status"] == "COMPLETE":
+                        logger.info(f"🏁 {res['ticker']}: Order Fully Executed")
+                    else:
+                        logger.warning(f"⚠️ {res['ticker']}: Order {res['status']} - {res['reason']}")
+        except Exception as e:
+            logger.error(f"Failed to verify order status: {e}")
+
+    # --- EXECUTION REPORT ---
+    if not dry_run:
+        try:
+            nm = NotificationManager()
+            recipient = get_secret("RECIPIENT_EMAIL")
+            if recipient:
+                subject = f"🚀 Execution Report - {time.strftime('%Y-%m-%d')}"
+                report_lines = [f"Market Execution Summary for {time.strftime('%Y-%m-%d %H:%M:%S')}\n"]
+                for r in execution_results:
+                    status_str = r.get('status', 'UNKNOWN')
+                    reason_str = f" ({r.get('reason') or r.get('error') or ''})" if r.get('status') != "COMPLETE" else ""
+                    report_lines.append(f"- {r['ticker']}: {r['quantity']} Qty -> {status_str}{reason_str}")
+                
+                nm.send_gmail(recipient, subject, "\n".join(report_lines))
+                logger.info("📧 Execution report email sent.")
+        except Exception as e:
+            logger.error(f"Failed to send execution report: {e}")
+
+    # Move to History
     if not dry_run:
         # Move to History
         history_ref = db.collection("rebalance_history").document()
