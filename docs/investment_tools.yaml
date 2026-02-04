@@ -127,7 +127,7 @@ paths:
                   description: Current LTP map (returned by get_market_snapshot).
                 targets:
                   type: object
-                  description: Map of Ticker -> % Target (e.g. {"RELIANCE": 0.2}).
+                  description: 'Map of Ticker -> % Target (e.g. {"RELIANCE": 0.2}).'
                 target_amounts:
                   type: object
                   description: Optional map for specific fixed amount allocations.

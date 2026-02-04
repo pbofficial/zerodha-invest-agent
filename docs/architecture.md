@@ -61,21 +61,53 @@ graph TD
 7. Agent saves a comprehensive Research Report to Firestore.
 8. Dashboard refreshes to show refined AI Signals and Insights.
 
-## The Paradigm Shift: From API Management to AI Management
+## The MCP Evolution: AI-First Gateway Architecture
 
-As of Phase 2, this architecture evolves from traditional REST integration to **AI Management via APIs**. 
+With Phase 2, we moved from **Direct Function Calling** to a **Model Context Protocol (MCP)** architecture managed by Apigee. 
 
-### 1. Model Context Protocol (MCP) as the Abstraction Layer
-By using Apigee as an **MCP Gateway**, we decouple the "Brain" from the specific "Hands". 
-- **The LLM** sees a stable set of capabilities (Tools).
-- **Apigee** manages the lifecycle, discovery (via API Hub), and governance of these tools.
-- **The Broker (Zerodha)** is abstracted away. Switching brokers in the future requires zero changes to the AI's reasoning logic.
+### What is MCP?
+Modern LLMs (Gemini, Claude, etc.) use the Model Context Protocol to bridge the gap between AI reasoning and external data/tools. It standardizes two main workflows:
+1.  **Selection (`list_tools`)**: The AI asks "What can you do?" and gets a standardized schema.
+2.  **Execution (`call_tool`)**: The AI sends a request to execute a specific capability.
 
-### 2. Generative AI Policies (LLM Snaps)
-We transition from basic rate limiting to **AI Governance**:
-- **Prompt Sanitization**: Using Model Armor to prevent adversarial prompts.
-- **Semantic Caching**: Reducing latency and cost by caching common financial queries.
-- **Token Quotas**: managing "AI Spend" at the gateway level rather than inside the application code.
+### The Role of Apigee as an MCP Gateway
+Instead of the "Brain" (Gemini) talking directly to Python functions, it talks to a **Unified MCP Endpoint** on Apigee.
 
-> [!NOTE]
-> This transition marks the move from "building an app with AI" to "building an autonomous AI-driven enterprise service."
+```mermaid
+graph TD
+    subgraph Brain ["The Brain (Reasoning Layer)"]
+        AI[Gemini 2.0]
+    end
+
+    subgraph Gateway ["The Gateway (Governance Layer)"]
+        Apigee[Apigee MCP Proxy]
+        Policies[Model Armor, Semantic Cache]
+    end
+
+    subgraph Providers ["The Hands (Execution Layer)"]
+        Zerodha[Zerodha Connector]
+        Upstox[Upstox/Alternative Provider]
+        News[News Scraper]
+    end
+
+    AI -- "1. What tools exist?" --> Apigee
+    Apigee -- "2. Returns valid Schemas" --> AI
+    AI -- "3. Execute 'Trade'" --> Apigee
+    Apigee -- "4. Routes & Authenticates" --> Zerodha
+```
+
+### Why does this matter? (The "Provider Swap" Scenario)
+
+If we wanted to add a second broker (e.g., **Upstox**) or switch away from Zerodha, the architecture handles it gracefully:
+
+1.  **Stable AI Interface**: The "Brain" still sees a `execute_trade` tool. The schema doesn't change.
+2.  **Gateway Routing**: We add a new `TargetEndpoint` in Apigee for Upstox.
+3.  **Conditional Execution**: Apigee can route based on headers, user ID, or weighted distribution (e.g., 50% Zerodha, 50% Upstox) without the AI even knowing the backend has changed.
+4.  **Backend Normalization**: If Upstox's API requires different fields, the Python function (The Hands) handles the transformation, keeping the Gateway interface pure.
+
+### Security & Governance
+- **No Direct Access**: Tools are never exposed to the public internet. Only the Gateway holds the identity (`GoogleIDToken`) to invoke them.
+- **AI-Informed Guardrails**: Apigee can use its "Generative AI Policies" to inspect the *intent* of a tool call before it reaches the financial backend.
+
+> [!IMPORTANT]
+> This architecture transforms the project from a "Trading App" into an "Investment Execution Grid" where providers are plug-and-play components.

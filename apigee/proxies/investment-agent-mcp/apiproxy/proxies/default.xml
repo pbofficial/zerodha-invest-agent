@@ -3,35 +3,53 @@
     <Description/>
     <FaultRules/>
     <PreFlow name="PreFlow">
-        <Request/>
+        <Request>
+            <Step>
+                <Name>Verify-API-Key</Name>
+            </Step>
+            <Step>
+                <Name>MCP-Router</Name>
+            </Step>
+        </Request>
         <Response/>
     </PreFlow>
+    <Flows>
+        <Flow name="MCP-ListTools">
+            <Description>Returns the list of available tools in MCP format</Description>
+            <Request/>
+            <Response>
+                <Step>
+                    <Name>MCP-ListTools</Name>
+                </Step>
+            </Response>
+            <Condition>(proxy.pathsuffix MatchesPath "/v1/list_tools") or (proxy.pathsuffix MatchesPath "/list_tools")</Condition>
+        </Flow>
+    </Flows>
     <PostFlow name="PostFlow">
         <Request/>
         <Response/>
     </PostFlow>
-    <Flows/>
     <HTTPProxyConnection>
         <BasePath>/mcp</BasePath>
         <Properties/>
     </HTTPProxyConnection>
+    <RouteRule name="NoRoute">
+        <Condition>(proxy.pathsuffix MatchesPath "/v1/list_tools") or (proxy.pathsuffix MatchesPath "/list_tools")</Condition>
+    </RouteRule>
     <RouteRule name="get_market_snapshot">
-        <Condition>(proxy.pathsuffix MatchesPath "/get_market_snapshot")</Condition>
+        <Condition>(proxy.pathsuffix MatchesPath "/get_market_snapshot") or (mcp.tool_name = "get_market_snapshot")</Condition>
         <TargetEndpoint>get-portfolio</TargetEndpoint>
     </RouteRule>
     <RouteRule name="calculate_orders">
-        <Condition>(proxy.pathsuffix MatchesPath "/calculate_orders")</Condition>
+        <Condition>(proxy.pathsuffix MatchesPath "/calculate_orders") or (mcp.tool_name = "calculate_orders")</Condition>
         <TargetEndpoint>calculate-allocations</TargetEndpoint>
     </RouteRule>
     <RouteRule name="check_financial_health">
-        <Condition>(proxy.pathsuffix MatchesPath "/check_financial_health")</Condition>
+        <Condition>(proxy.pathsuffix MatchesPath "/check_financial_health") or (mcp.tool_name = "check_financial_health")</Condition>
         <TargetEndpoint>check-financial-health</TargetEndpoint>
     </RouteRule>
     <RouteRule name="get_market_news">
-        <Condition>(proxy.pathsuffix MatchesPath "/get_market_news")</Condition>
+        <Condition>(proxy.pathsuffix MatchesPath "/get_market_news") or (mcp.tool_name = "get_market_news")</Condition>
         <TargetEndpoint>get-market-news</TargetEndpoint>
-    </RouteRule>
-    <RouteRule name="default">
-        <TargetEndpoint>get-portfolio</TargetEndpoint>
     </RouteRule>
 </ProxyEndpoint>
