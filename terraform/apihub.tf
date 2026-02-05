@@ -12,6 +12,7 @@ resource "null_resource" "register_apihub_tools" {
 
   triggers = {
     description = each.value
+    version     = "v1-mcp-branding"
   }
 
   provisioner "local-exec" {
@@ -21,29 +22,41 @@ resource "null_resource" "register_apihub_tools" {
       $displayName = "${each.key}"
       $description = "${each.value}"
       
+      # Enterprise Attributes for Registry Styling
+      $attributes = @{
+        "projects/${var.project_id}/locations/${var.region}/attributes/system-api-style" = @{
+          enum_values = @{ values = @( @{ id = "mcp-api" } ) }
+        }
+        "projects/${var.project_id}/locations/${var.region}/attributes/system-maturity-level" = @{
+          enum_values = @{ values = @( @{ id = "level-3" } ) }
+        }
+        "projects/${var.project_id}/locations/${var.region}/attributes/system-target-user" = @{
+          enum_values = @{ values = @( @{ id = "internal" } ) }
+        }
+      }
+
       $body = @{
         displayName = $displayName
         description = $description
-      } | ConvertTo-Json -Compress
+        attributes  = $attributes
+      } | ConvertTo-Json -Depth 10 -Compress
       
       try {
-        Write-Host "Re-registering Tool: $apiId"
-        # Force a clean update by attempting delete first (safe to fail if not exists)
-        $null = & gcloud auth print-access-token # just to ensure we have it
-        
-        # Try Delete (ignore errors if it doesn't exist)
+        Write-Host "Re-registering Tool with MCP Branding: $apiId"
+        # Force a clean update (Registry IDs are immutable for styles in some versions)
         Invoke-RestMethod -Uri "https://apihub.googleapis.com/v1/projects/${var.project_id}/locations/${var.region}/apis/$apiId" `
           -Method Delete `
           -Headers @{ Authorization = "Bearer $token" } -ErrorAction SilentlyContinue
         
-        # Create
+        # Create with MCP Style
         Invoke-RestMethod -Uri "https://apihub.googleapis.com/v1/projects/${var.project_id}/locations/${var.region}/apis?apiId=$apiId" `
           -Method Post `
           -Headers @{ Authorization = "Bearer $token" } `
           -Body $body `
           -ContentType "application/json"
-        Write-Host "Successfully registered $apiId"
+        Write-Host "Successfully registered $apiId with MCP Style"
       } catch {
+        Write-Host "Error registering $apiId : $($_.Exception.Message)"
         throw $_.Exception
       }
     EOT
