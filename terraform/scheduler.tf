@@ -6,9 +6,10 @@ resource "google_cloud_scheduler_job" "daily_nudge" {
   time_zone        = "America/New_York"
   attempt_deadline = "180s"
 
-  http_target {
+    http_target {
     http_method = "POST"
     uri         = google_cloudfunctions2_function.trigger_nudge.service_config[0].uri
+    body        = "e30=" # Base64 for {}
     
     oidc_token {
       service_account_email = google_service_account.scheduler_invoker.email
@@ -27,6 +28,7 @@ resource "google_cloud_scheduler_job" "morning_execution_job" {
   http_target {
     http_method = "POST"
     uri         = google_cloudfunctions2_function.morning_execution.service_config[0].uri
+    body        = "e30=" # Base64 for {}
     
     oidc_token {
       service_account_email = google_service_account.scheduler_invoker.email

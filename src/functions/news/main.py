@@ -1,48 +1,93 @@
-
 import logging
+from datetime import datetime
 from duckduckgo_search import DDGS
+import yfinance as yf
+import concurrent.futures
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import concurrent.futures
-
 def _fetch_ticker_news(ticker):
-    """Helper to fetch news for a single ticker."""
+    """Helper to fetch news for a single ticker with high sensitivity."""
     news_items = []
     seen_urls = set()
+    
+    # 1. Normalize Ticker & Get Company Name (Crucial for search hits)
     clean_ticker = ticker.split(':')[-1] if ':' in ticker else ticker
+    yf_symbol = clean_ticker if clean_ticker.endswith(".NS") or clean_ticker.endswith(".BO") else f"{clean_ticker}.NS"
+    
+    company_name = clean_ticker
+    try:
+        # We only need the longName, which is usually fast
+        stock = yf.Ticker(yf_symbol)
+        company_name = stock.info.get("longName") or clean_ticker
+        # Remove common suffixes to keep search terms broad
+        company_name = company_name.replace("Limited", "").replace("Ltd", "").strip()
+    except Exception as e:
+        logger.warning(f"Could not fetch company name for {ticker}: {e}")
+
+    # 2. Balanced Cynical Queries (Past 14 Days & Current Year)
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    current_year = str(now.year)
+    cutoff_date = now - timedelta(days=14)
     
     queries = [
-        f"{clean_ticker} fraud investigation raid",
-        f"{clean_ticker} SEBI penalty regulatory action",
-        f"{clean_ticker} CEO resignation management exit",
-        f"{clean_ticker} quarterly results profit drop"
+        f"{company_name} fraud {current_year}",
+        f"{company_name} SEBI penalty {current_year}",
+        f"{company_name} police complaint {current_year}",
+        f"{company_name} investigation {current_year}",
+        f"{company_name} negative news {current_year}",
+        f"{clean_ticker} stock crash {current_year}"
     ]
     
     try:
-        # DDGS context manager is not thread-safe if shared, so instantiate per thread or use outside?
-        # DDGS documents say it's better to instantiate one object if possible, but for threads safer to use fresh or context?
-        # To be safe and simple: Instantiate fresh DDGS() for each ticker is robust but maybe slower connect time.
-        # However, DDGS() usually uses requests Session. 
-        # Let's try instantiating per thread.
         with DDGS() as ddgs:
             for query in queries:
                 try:
-                    # timelimit='w' restricts to past week (7 days)
-                    results = ddgs.text(query, max_results=2, timelimit="w")
-                    for r in results:
-                        url = r.get("href")
-                        if url and url not in seen_urls:
-                            news_items.append({
-                                "title": r.get("title"),
-                                "snippet": r.get("body"),
-                                "url": url
-                            })
-                            seen_urls.add(url)
-                except Exception as q_e:
-                    # Individual query failure should not fail the whole ticker
+                    # 'in-en' region for Indian market news
+                    results = ddgs.news(query, region='in-en', max_results=5, timelimit="w")
+                    if results:
+                        for r in results:
+                            url = r.get("url")
+                            title = r.get("title", "")
+                            snippet = r.get("body", "")
+                            date_str = r.get("date", "")
+                            
+                            # --- STRICT RECENCY & YEAR FILTER ---
+                            is_recent = True
+                            if date_str:
+                                try:
+                                    # DDG News usually returns ISO format: 2026-02-04T12:30:00+00:00
+                                    # We take the first 10 chars for YYYY-MM-DD
+                                    article_date = datetime.strptime(date_str[:10], "%Y-%m-%d")
+                                    if article_date < cutoff_date or article_date.year != now.year:
+                                        is_recent = False
+                                except Exception:
+                                    pass # If date parsing fails, we fallback to text matching
+                            
+                            # 3. RELEVANCE & CYNICAL FILTER
+                            text_body = (title + " " + snippet).lower()
+                            
+                            # Mandatory: Match either Company Name or Ticker (Prevents NFL/US news)
+                            name_match = (company_name.lower() in text_body or 
+                                         clean_ticker.lower() in text_body or
+                                         ticker.lower() in text_body)
+                            
+                            # Indian Market Context
+                            india_keywords = ["india", "sebi", "nse", "bse", "crore", "inr", "₹", "mumbai", "delhi"]
+                            india_related = any(kw in text_body for kw in india_keywords)
+                            
+                            if url and url not in seen_urls and is_recent and name_match and india_related:
+                                news_items.append({
+                                    "title": title,
+                                    "snippet": snippet,
+                                    "url": url,
+                                    "date": date_str
+                                })
+                                seen_urls.add(url)
+                except Exception:
                     continue
                     
     except Exception as e:
@@ -51,7 +96,7 @@ def _fetch_ticker_news(ticker):
     if not news_items:
         return ticker, [{
             "title": "No Material News",
-            "snippet": "No significant negative news found regarding fraud, SEBI actions, management, or profit drops.",
+            "snippet": f"No significant negative headlines found for {company_name} ({clean_ticker}) in the past 14 days ({current_year}).",
             "url": ""
         }]
     return ticker, news_items

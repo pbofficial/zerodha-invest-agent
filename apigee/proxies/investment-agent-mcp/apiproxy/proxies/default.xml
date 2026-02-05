@@ -16,7 +16,11 @@
     <Flows>
         <Flow name="MCP-ListTools">
             <Description>Returns the list of available tools in MCP format</Description>
-            <Request/>
+            <Request>
+                <Step>
+                    <Name>Discovery-API-Hub</Name>
+                </Step>
+            </Request>
             <Response>
                 <Step>
                     <Name>MCP-ListTools</Name>

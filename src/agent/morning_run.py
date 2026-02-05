@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import time
+import json
 from google.cloud import firestore
 from kiteconnect import KiteConnect
 
@@ -98,10 +99,10 @@ def run_morning_execution(request=None, dry_run=False, force=False, api_key_over
             cash = margins.get("equity", {}).get("net", 0)
             logger.info(f"💰 Available Cash: ₹{cash}")
             
-            # If we're not in dry run, and cash is 0, we should probably stop or at least warn loudly
+            # If we're not in dry run, and cash is 0, we still proceed to attempt orders
+            # and let Kite handle the rejections (Insufficient Funds) for better audit logs.
             if cash <= 0 and not dry_run:
-                logger.error("🛑 ZERO FUNDS AVAILABLE. Aborting execution to avoid system errors.")
-                return "Insufficient Funds", 400
+                logger.warning("⚠️ ZERO FUNDS REPORTED. Proceeding with order attempts to capture Kite API rejections.")
 
         except Exception as e:
             logger.error(f"🚫 Session/Fund Validation Failed: {e}")

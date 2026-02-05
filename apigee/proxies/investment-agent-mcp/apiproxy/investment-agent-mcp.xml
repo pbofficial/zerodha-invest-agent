@@ -17,6 +17,7 @@
         <Policy>Verify-API-Key</Policy>
         <Policy>MCP-Router</Policy>
         <Policy>MCP-ListTools</Policy>
+        <Policy>Discovery-API-Hub</Policy>
     </Policies>
     <Resources>
         <Resource>openapi://investment_tools.yaml</Resource>

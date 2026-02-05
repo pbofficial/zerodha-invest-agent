@@ -1,27 +1,35 @@
-// MCP Tool Definition (Matches API Hub Spec)
-var toolsResponse = {
-    "tools": [
-        {
-            "name": "get_market_snapshot",
-            "description": "Get live market prices and user holdings. Use this as the first step for ANY portfolio analysis to check gaps between target and actual allocations.",
-            "inputSchema": { "type": "object", "properties": { "tickers": { "type": "array", "items": { "type": "string" }, "description": "NSE symbols, uppercase (e.g., 'TCS'). Use ['ALL'] to get full portfolio." } }, "required": ["tickers"] }
-        },
-        {
-            "name": "check_financial_health",
-            "description": "Audit stock for profit declines. Analyzes quarterly profit trends and returns WARNING if profits have dropped for 2 consecutive quarters.",
-            "inputSchema": { "type": "object", "properties": { "ticker": { "type": "string", "description": "NSE Ticker symbol." } }, "required": ["ticker"] }
-        },
-        {
-            "name": "calculate_orders",
-            "description": "Finalize trade quantities based on budget. Mathematical engine to convert 'Target Allocations' into 'Order Quantities'.",
-            "inputSchema": { "type": "object", "properties": { "budget": { "type": "number", "description": "Total cash available." }, "portfolio": { "type": "array", "description": "Current holdings list." }, "prices": { "type": "object", "description": "Current LTP map." }, "targets": { "type": "object", "description": "Map of Ticker -> Target %." } }, "required": ["budget", "portfolio", "prices", "targets"] }
-        },
-        {
-            "name": "get_market_news",
-            "description": "Scour the web for regulatory or fraud risks. Fetches cynical news focusing on fraud and management exits.",
-            "inputSchema": { "type": "object", "properties": { "tickers": { "type": "array", "items": { "type": "string" }, "description": "List of ticker symbols to audit." } }, "required": ["tickers"] }
-        }
-    ]
+// MCP Tool Discovery Logic (Enterprise Pattern)
+// Pulls from API Hub ServiceCallout 'apihubResponse'
+var apihubResContent = context.getVariable("apihubResponse.content");
+var apihubData = JSON.parse(apihubResContent);
+var hubApis = apihubData.apis || [];
+
+// Static Schema Mapping (In Enterprise, these could also be fetched from Hub Specs)
+var SCHEMAS = {
+    "get-market-snapshot": { "type": "object", "properties": { "tickers": { "type": "array", "items": { "type": "string" }, "description": "NSE symbols, uppercase (e.g., 'TCS'). Use ['ALL'] to get full portfolio." } }, "required": ["tickers"] },
+    "check-financial-health": { "type": "object", "properties": { "ticker": { "type": "string", "description": "NSE Ticker symbol." } }, "required": ["ticker"] },
+    "calculate-allocations": { "type": "object", "properties": { "budget": { "type": "number", "description": "Total cash available." }, "portfolio": { "type": "array", "description": "Current holdings list." }, "prices": { "type": "object", "description": "Current LTP map." }, "targets": { "type": "object", "description": "Map of Ticker -> Target %." } }, "required": ["budget", "portfolio", "prices", "targets"] },
+    "get-market-news": { "type": "object", "properties": { "tickers": { "type": "array", "items": { "type": "string" }, "description": "List of ticker symbols to audit." } }, "required": ["tickers"] }
 };
+
+var tools = [];
+
+hubApis.forEach(function (api) {
+    var toolId = api.name.split("/").pop(); // e.g. "get-market-snapshot"
+
+    // Fallback: If mcp_type attribute is missing, check if we have a schema for it
+    // This allows discovery to work even if the registry tags are missing.
+    if (SCHEMAS[toolId]) {
+        var mcpName = toolId.replace(/\-/g, "_"); // e.g. "get_market_snapshot"
+
+        tools.push({
+            "name": mcpName,
+            "description": api.description || api.displayName,
+            "inputSchema": SCHEMAS[toolId]
+        });
+    }
+});
+
+var toolsResponse = { "tools": tools };
 context.setVariable("response.content", JSON.stringify(toolsResponse));
 context.setVariable("response.header.Content-Type", "application/json");
