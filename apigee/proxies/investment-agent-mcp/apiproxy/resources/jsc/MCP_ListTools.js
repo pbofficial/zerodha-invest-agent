@@ -17,9 +17,28 @@ var tools = [];
 hubApis.forEach(function (api) {
     var toolId = api.name.split("/").pop(); // e.g. "get-market-snapshot"
 
-    // Fallback: If mcp_type attribute is missing, check if we have a schema for it
-    // This allows discovery to work even if the registry tags are missing.
-    if (SCHEMAS[toolId]) {
+    // Enterprise Enforcement: Must have "mcp-api" badge
+    var hasMcpBadge = false;
+    try {
+        if (api.apiStyle &&
+            api.apiStyle.enumValues &&
+            api.apiStyle.enumValues.values &&
+            api.apiStyle.enumValues.values.length > 0) {
+
+            // Robust check: Handle both Object (standard JSON) and String (edge cases)
+            var styleVal = api.apiStyle.enumValues.values[0];
+            var styleStr = (typeof styleVal === 'object') ? JSON.stringify(styleVal) : String(styleVal);
+
+            if (styleStr.indexOf("mcp-api") !== -1) {
+                hasMcpBadge = true;
+            }
+        }
+    } catch (e) {
+        print("Error checking badge for " + toolId + ": " + e);
+    }
+
+    // Strict Filter: Only allow if it has the badge AND we have a schema
+    if (hasMcpBadge && SCHEMAS[toolId]) {
         var mcpName = toolId.replace(/\-/g, "_"); // e.g. "get_market_snapshot"
 
         tools.push({
@@ -27,6 +46,8 @@ hubApis.forEach(function (api) {
             "description": api.description || api.displayName,
             "inputSchema": SCHEMAS[toolId]
         });
+    } else {
+        print("Skipping tool " + toolId + " (Badge: " + hasMcpBadge + ", Schema: " + !!SCHEMAS[toolId] + ")");
     }
 });
 
