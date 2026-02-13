@@ -373,8 +373,8 @@ def paginate_dataframe(df, key, items_per_page=10):
 
 # --- ADVISOR INTEGRATION ---
 def get_advisor():
-    from src.agent.advisor import InvestmentAdvisor
-    return InvestmentAdvisor()
+    from src.agent.advisor import get_advisor as advisor_factory
+    return advisor_factory()
 
 def format_agent_logs(raw_logs):
     """Parses raw subprocess logs into a clean, markdown 'Logic Stream'."""
@@ -745,8 +745,9 @@ elif st.session_state["active_tab"] == "🎯 Trading Desk":
                     env["KITE_ACCESS_TOKEN"] = st.session_state["kite_token"]
                     env["PROJECT_ID"] = project_id
                     env["DASHBOARD_URL"] = dashboard_url
+                    env["USE_APIGEE_MCP"] = "true" # Force MCP Mode
                     try:
-                        logger.info(f"🤖 Starting Analysis Subprocess: Budget={invest_amt}")
+                        logger.info(f"🤖 Starting Analysis Subprocess: Budget={invest_amt}. MCP Mode: {env.get('USE_APIGEE_MCP')}")
                         result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
                         logger.info("✅ Analysis Subprocess Completed Successfully.")
                         st.session_state["agent_logs"] = result.stdout
@@ -986,12 +987,17 @@ elif st.session_state["active_tab"] == "⚙️ Config":
         st.markdown("### 🤖 Agent Intelligence Settings")
         col1, col2, col3 = st.columns(3)
         
+        current_settings = agent_data.get("agent_settings", {})
+        
         with col1:
-            current_settings = agent_data.get("agent_settings", {})
-            new_model = st.selectbox("Model Name", 
-                                   options=["gemini-2.0-flash", "gemini-1.5-pro"], 
-                                   index=0 if current_settings.get("model_name") == "gemini-2.0-flash" else 1)
-            new_location = st.text_input("GCP Location", value=current_settings.get("location", "us-east4"))
+            from src.utils.project import get_model_name, get_location
+            model_options = ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+            try:
+                model_index = model_options.index(get_model_name())
+            except ValueError:
+                model_index = 0
+            new_model = st.selectbox("Model Name", options=model_options, index=model_index)
+            new_location = st.text_input("GCP Location", value=get_location())
             
         with col2:
             new_risk = st.slider("Risk Threshold (0-10)", 0, 10, int(current_settings.get("risk_threshold", 8)))
@@ -1036,6 +1042,7 @@ elif st.session_state["active_tab"] == "⚙️ Config":
         # 3. Save All Logic
         if st.button("💾 Save All Changes to Cloud", type="primary"):
             try:
+                logger.info("💾 Committing comprehensive configuration update to Cloud...")
                 # Prepare Agent Settings
                 new_agent_config = {
                     "agent_settings": {
@@ -1061,6 +1068,9 @@ elif st.session_state["active_tab"] == "⚙️ Config":
                     a["target_amount"] = int(a.get("target_amount") or 0)
                     a["target_weight"] = float(a.get("target_weight") or 0.0)
                 
+                logger.debug(f"📊 New Agent Config: {json.dumps(new_agent_config)}")
+                logger.debug(f"🌌 New Universe Assets count: {len(new_assets)}")
+
                 # Save via Utility and Direct Firestore for Universe
                 db.collection("config").document("agent_settings").set(new_agent_config)
                 db.collection("config").document("universe").set({"assets": new_assets})
@@ -1069,11 +1079,13 @@ elif st.session_state["active_tab"] == "⚙️ Config":
                 pending_ref = db.collection("pending_orders").document("latest")
                 pending_ref.update({"status": "DRAFT"})
 
+                logger.info("✅ Cloud Sync Success: agent_settings, universe, and pending_orders status updated.")
                 st.success("✅ Cloud Configuration Updated! Changes will take effect in the next Agent run.")
                 st.balloons()
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
+                logger.error(f"❌ Save All failed: {e}")
                 st.error(f"Save failed: {e}")
 
     except Exception as e:

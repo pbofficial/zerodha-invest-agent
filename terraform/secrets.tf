@@ -62,6 +62,15 @@ resource "google_secret_manager_secret" "allowed_user_id" {
   depends_on = [google_project_service.apis]
 }
 
+resource "google_secret_manager_secret" "apigee_api_key" {
+  secret_id = "APIGEE_API_KEY"
+  replication {
+    auto {}
+  }
+  project = var.project_id
+  depends_on = [google_project_service.apis]
+}
+
 resource "google_secret_manager_secret_version" "kite_api_key_v1" {
   secret      = google_secret_manager_secret.kite_api_key.id
   secret_data = "placeholder_replace_me"
@@ -95,6 +104,11 @@ resource "google_secret_manager_secret_version" "recipient_email_v1" {
 resource "google_secret_manager_secret_version" "allowed_user_id_v1" {
   secret      = google_secret_manager_secret.allowed_user_id.id
   secret_data = "placeholder_replace_me" 
+}
+
+resource "google_secret_manager_secret_version" "apigee_api_key_v1" {
+  secret      = google_secret_manager_secret.apigee_api_key.id
+  secret_data = "placeholder_replace_me"
 }
 
 data "google_project" "project" {}

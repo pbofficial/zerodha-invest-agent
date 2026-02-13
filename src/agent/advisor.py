@@ -11,28 +11,40 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Advisor")
 
+def get_advisor():
+    """
+    Factory function to return the appropriate advisor based on environment.
+    """
+    use_mcp = os.environ.get("USE_APIGEE_MCP", "false").lower() == "true"
+    if use_mcp:
+        logger.info("🚀 Instantiating MCPInvestmentAdvisor (Apigee Mode)")
+        from src.agent.mcp_advisor import MCPInvestmentAdvisor
+        return MCPInvestmentAdvisor()
+    
+    logger.info("🏢 Instantiating Standard InvestmentAdvisor (Direct Mode)")
+    return InvestmentAdvisor()
+
 class InvestmentAdvisor:
     def __init__(self):
-        from src.utils.project import get_project_id
+        from src.utils.project import get_project_id, get_location, get_model_name
         self.project_id = get_project_id()
         
-        # Load Config via Unified Cloud Loader
+        # Load Config
         from src.utils.config_loader import config as cloud_config
         try:
             self.config = cloud_config.get_agent_settings()
-            settings = self.config.get("agent_settings", {})
             self.scoring = self.config.get("scoring_rules", {})
             self.goals = self.config.get("investment_goals", {})
+            self.risk_threshold = self.config.get("agent_settings", {}).get("risk_threshold", 8)
         except Exception as e:
             logger.error(f"⚠️ Advisor config load error: {e}")
-            settings = {}
             self.scoring = {}
             self.goals = {}
             self.config = {}
+            self.risk_threshold = 8 # Default if config fails
 
-        self.location = os.environ.get("LOCATION", settings.get("location", "us-east4"))
-        self.model_name = os.environ.get("MODEL_NAME", settings.get("model_name", "gemini-2.0-flash"))
-        self.risk_threshold = settings.get("risk_threshold", 8)
+        self.location = get_location()
+        self.model_name = get_model_name()
         
         # Initialize Vertex AI
         logger.info(f"🧠 Advisor Initializing: Project={self.project_id} | Location={self.location} | Model={self.model_name}")

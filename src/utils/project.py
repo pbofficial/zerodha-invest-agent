@@ -84,3 +84,69 @@ def get_dashboard_url():
     
     # Absolute last resort fallback
     return f"https://portfolio-dashboard-{project_id}.{region}.run.app"
+
+def get_apigee_mcp_endpoint():
+    """
+    Returns the internal Apigee MCP endpoint.
+    Defaulting to the user-provided internal IP for the private network.
+    """
+    endpoint = os.environ.get("APIGEE_MCP_ENDPOINT", "https://10.140.24.2")
+    logger.debug(f"ℹ️ Apigee MCP Endpoint resolved: {endpoint}")
+    return endpoint
+
+def get_apigee_api_key():
+    """
+    Fetches the Apigee API Key from Secret Manager or Env.
+    """
+    from src.utils.secrets import get_secret
+    return get_secret("APIGEE_API_KEY")
+
+def get_location():
+    """
+    Resolves the GCP Location (Region) with precedence:
+    1. Environment Variable: LOCATION
+    2. Firestore Config: agent_settings.location
+    3. Fallback: us-east4
+    """
+    loc = os.environ.get("LOCATION")
+    if loc:
+        logger.info(f"✅ Resolved Location from Env: {loc}")
+        return loc
+    
+    try:
+        from src.utils.config_loader import config
+        settings = config.get_agent_settings().get("agent_settings", {})
+        loc = settings.get("location")
+        if loc:
+            logger.info(f"✅ Resolved Location from Firestore: {loc}")
+            return loc
+    except Exception as e:
+        logger.debug(f"ℹ️ Firestore location look-up skipped/failed: {e}")
+        
+    logger.info("ℹ️ Using Default Location: us-east4")
+    return "us-east4"
+
+def get_model_name():
+    """
+    Resolves the Vertex AI Model Name with precedence:
+    1. Environment Variable: MODEL_NAME
+    2. Firestore Config: agent_settings.model_name
+    3. Fallback: gemini-2.0-flash
+    """
+    model = os.environ.get("MODEL_NAME")
+    if model:
+        logger.info(f"✅ Resolved Model from Env: {model}")
+        return model
+        
+    try:
+        from src.utils.config_loader import config
+        settings = config.get_agent_settings().get("agent_settings", {})
+        model = settings.get("model_name")
+        if model:
+            logger.info(f"✅ Resolved Model from Firestore: {model}")
+            return model
+    except Exception as e:
+        logger.debug(f"ℹ️ Firestore model look-up skipped/failed: {e}")
+        
+    logger.info("ℹ️ Using Default Model: gemini-2.0-flash")
+    return "gemini-2.0-flash"

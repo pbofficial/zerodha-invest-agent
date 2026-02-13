@@ -320,18 +320,17 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
     # Initialize Vertex AI
     # Use global SETTINGS and GOALS loaded from config
     
-    project_id = os.environ.get("PROJECT_ID")
-    location = os.environ.get("LOCATION", SETTINGS.get("location", "us-east4"))
+    from src.utils.project import get_project_id, get_location, get_model_name
+    project_id = get_project_id()
+    location = get_location()
+    model_name = get_model_name()
+    
+    logger.info(f"🚀 Initializing Vertex AI: Project={project_id} | Location={location} | Model={model_name}")
     
     if not project_id:
-        logger.warning("PROJECT_ID env var not set. Vertex AI init might fail or use default.")
+        logger.warning("⚠️ PROJECT_ID resolution failed. Vertex AI init might fail or use default.")
     
     vertexai.init(project=project_id, location=location)
-    
-    # Initialize Model
-    # Allow env var override, else use config
-    model_name_env = os.environ.get("MODEL_NAME")
-    model_name = model_name_env if model_name_env else SETTINGS.get("model_name", "gemini-2.0-flash")
     
     # --- DYNAMIC PROMPT CONSTRUCTION ---
     # Ensure ASSETS are fresh from the loaded config
@@ -351,9 +350,23 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
     if GOALS.get("target_portfolio"):
         target_portfolio_str = GOALS.get("target_portfolio")
 
+    # --- TOOL & FUNCTION SETUP ---
+    use_apigee = os.environ.get("USE_APIGEE_MCP", "false").lower() == "true"
+    mcp_advisor = None
+    
+    if use_apigee:
+        logger.info("🚀 Using Apigee MCP for Tool Discovery and Execution")
+        from src.agent.mcp_advisor import MCPInvestmentAdvisor
+        mcp_advisor = MCPInvestmentAdvisor()
+        discovered_tools = mcp_advisor._discover_tools()
+        tools_config = [Tool(function_declarations=discovered_tools)] if discovered_tools else []
+    else:
+        logger.info("🏢 Using Direct Function Calling (Standard Mode)")
+        tools_config = [invest_tool]
+
     model = GenerativeModel(
         model_name,
-        tools=[invest_tool],
+        tools=tools_config,
         system_instruction=system_instruction
     )
     
@@ -411,26 +424,26 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
             
             logger.info(f"Model requesting tool: {func_name}")
             
-            if func_name in function_map:
+            if use_apigee and mcp_advisor:
+                # 🛠️ EXECUTE VIA APIGEE
                 try:
-                    result = function_map[func_name](**func_args)
+                    result = mcp_advisor._execute_tool(func_name, func_args)
                     
-                    # Ensure result is serializable
-                    if not isinstance(result, (dict, list, str, int, float, bool)):
-                        result = {"result": str(result)}
-                    elif not isinstance(result, dict):
-                        result = {"result": result}
-                        
+                    # Special Case: Capture orders for consolidation logic below
+                    if func_name == 'calculate_orders':
+                        # The tool returns a list of orders. We need to save it.
+                        captured_orders = result if isinstance(result, list) else result.get('result', [])
+                        logger.info(f"DEBUG: [MCP] calculate_orders returned {len(captured_orders)} items.")
+
                     function_responses.append(
                         vertexai.generative_models.Part.from_function_response(
                             name=func_name,
                             response={"content": result}
                         )
                     )
-                    logger.info(f"Tool {func_name} executed successfully.")
+                    logger.info(f"Tool {func_name} executed via Apigee successfully.")
                 except Exception as e:
-                    logger.error(f"Tool {func_name} execution failed: {e}")
-                    # Provide an error response to the model so it can continue or fail gracefully
+                    logger.error(f"Apigee Tool {func_name} execution failed: {e}")
                     function_responses.append(
                         vertexai.generative_models.Part.from_function_response(
                             name=func_name,
@@ -438,19 +451,45 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
                         )
                     )
             else:
-                logger.error(f"Unknown function requested: {func_name}")
+                # 🏢 EXECUTE DIRECTLY
+                if func_name in function_map:
+                    try:
+                        result = function_map[func_name](**func_args)
+                        
+                        # Ensure result is serializable
+                        if not isinstance(result, (dict, list, str, int, float, bool)):
+                            result = {"result": str(result)}
+                        elif not isinstance(result, dict):
+                            result = {"result": result}
+                            
+                        function_responses.append(
+                            vertexai.generative_models.Part.from_function_response(
+                                name=func_name,
+                                response={"content": result}
+                            )
+                        )
+                        logger.info(f"Tool {func_name} executed successfully.")
+                    except Exception as e:
+                        logger.error(f"Tool {func_name} execution failed: {e}")
+                        function_responses.append(
+                            vertexai.generative_models.Part.from_function_response(
+                                name=func_name,
+                                response={"content": {"error": str(e)}}
+                            )
+                        )
+                else:
+                    logger.error(f"Unknown function requested: {func_name}")
         
         if not function_responses:
             break
-            
-        # Capture responses AND any model thoughts emitted
+        
+        # Capture thoughts...
         for part in response.candidates[0].content.parts:
-            # SAFETY: Check if part has text before accessing it
             if hasattr(part, "text") and part.text:
                 logger.info(f"AGENT THOUGHT: {part.text}")
-                print(f"AGENT THOUGHT: {part.text}") # For dashboard logs
+                print(f"AGENT THOUGHT: {part.text}") 
 
-        # Send ALL responses back to the model at once (Parallel Function Calling)
+        # Send back to model
         response = chat.send_message(function_responses)
 
     # --- FINAL Turn Enforcement ---

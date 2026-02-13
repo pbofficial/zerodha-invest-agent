@@ -82,6 +82,26 @@ resource "google_cloud_run_v2_service" "dashboard" {
         name  = "DASHBOARD_URL"
         value = local.dashboard_url
       }
+
+      env {
+        name  = "MODEL_NAME"
+        value = var.model_name
+      }
+
+      env {
+        name  = "APIGEE_MCP_ENDPOINT"
+        value = var.apigee_mcp_endpoint
+      }
+
+      env {
+        name  = "USE_APIGEE_MCP"
+        value = "true"
+      }
+    }
+    
+    vpc_access {
+      connector = google_vpc_access_connector.connector.id
+      egress    = "PRIVATE_RANGES_ONLY"
     }
   }
 }

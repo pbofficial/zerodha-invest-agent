@@ -48,8 +48,10 @@ resource "google_cloudfunctions2_function" "get_portfolio" {
     vpc_connector = google_vpc_access_connector.connector.id
     
     environment_variables = {
-      PROJECT_ID = var.project_id
-      LOCATION   = var.region
+      PROJECT_ID          = var.project_id
+      LOCATION            = var.region
+      MODEL_NAME          = var.model_name
+      APIGEE_MCP_ENDPOINT = var.apigee_mcp_endpoint
     }
   }
   
@@ -83,8 +85,10 @@ resource "google_cloudfunctions2_function" "calculate_allocations" {
     vpc_connector = google_vpc_access_connector.connector.id
 
      environment_variables = {
-      PROJECT_ID = var.project_id
-      LOCATION   = var.region
+      PROJECT_ID          = var.project_id
+      LOCATION            = var.region
+      MODEL_NAME          = var.model_name
+      APIGEE_MCP_ENDPOINT = var.apigee_mcp_endpoint
     }
   }
   
@@ -120,8 +124,10 @@ resource "google_cloudfunctions2_function" "execute_trade" {
     service_account_email = google_service_account.zerodha_agent_sa.email
 
     environment_variables = {
-      PROJECT_ID = var.project_id
-      LOCATION   = var.region
+      PROJECT_ID          = var.project_id
+      LOCATION            = var.region
+      MODEL_NAME          = var.model_name
+      APIGEE_MCP_ENDPOINT = var.apigee_mcp_endpoint
     }
 
     secret_environment_variables {
@@ -195,10 +201,13 @@ resource "google_cloudfunctions2_function" "trigger_nudge" {
     timeout_seconds    = 300
     
     service_account_email = google_service_account.zerodha_agent_sa.email
+    vpc_connector         = google_vpc_access_connector.connector.id
     environment_variables = {
-      PROJECT_ID      = var.project_id
-      LOCATION        = var.region
-      DASHBOARD_URL   = local.dashboard_url
+      PROJECT_ID          = var.project_id
+      LOCATION            = var.region
+      DASHBOARD_URL       = local.dashboard_url
+      MODEL_NAME          = var.model_name
+      APIGEE_MCP_ENDPOINT = var.apigee_mcp_endpoint
     }
 
     secret_environment_variables {
@@ -255,9 +264,12 @@ resource "google_cloudfunctions2_function" "morning_execution" {
     timeout_seconds    = 300
     
     service_account_email = google_service_account.zerodha_agent_sa.email
+    vpc_connector         = google_vpc_access_connector.connector.id
     environment_variables = {
-      PROJECT_ID = var.project_id
-      LOCATION   = var.region
+      PROJECT_ID          = var.project_id
+      LOCATION            = var.region
+      MODEL_NAME          = var.model_name
+      APIGEE_MCP_ENDPOINT = var.apigee_mcp_endpoint
     }
 
     secret_environment_variables {
@@ -317,8 +329,10 @@ resource "google_cloudfunctions2_function" "check_financial_health" {
     vpc_connector = google_vpc_access_connector.connector.id
     
     environment_variables = {
-      PROJECT_ID = var.project_id
-      LOCATION   = var.region
+      PROJECT_ID          = var.project_id
+      LOCATION            = var.region
+      MODEL_NAME          = var.model_name
+      APIGEE_MCP_ENDPOINT = var.apigee_mcp_endpoint
     }
   }
   
@@ -352,8 +366,10 @@ resource "google_cloudfunctions2_function" "get_market_news" {
     vpc_connector = google_vpc_access_connector.connector.id
     
     environment_variables = {
-      PROJECT_ID = var.project_id
-      LOCATION   = var.region
+      PROJECT_ID          = var.project_id
+      LOCATION            = var.region
+      MODEL_NAME          = var.model_name
+      APIGEE_MCP_ENDPOINT = var.apigee_mcp_endpoint
     }
   }
   
