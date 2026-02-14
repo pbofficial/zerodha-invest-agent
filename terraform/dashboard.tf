@@ -92,6 +92,11 @@ resource "google_cloud_run_v2_service" "dashboard" {
         name  = "APIGEE_MCP_ENDPOINT"
         value = var.apigee_mcp_endpoint
       }
+      
+      env {
+        name  = "APIGEE_HOST_HEADER"
+        value = var.apigee_host
+      }
 
       env {
         name  = "USE_APIGEE_MCP"

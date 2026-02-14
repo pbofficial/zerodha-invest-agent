@@ -3,7 +3,9 @@ param (
     [string]$ProjectId,
     [Parameter(Mandatory=$true)]
     [string]$RecipientEmail,
-    [string]$Region = "us-east4"
+    [string]$Region = "us-east4",
+    [string]$ApigeeEnv = "eval",
+    [string]$ApigeeHost = "investment-agent.example.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +32,9 @@ gcloud services enable `
 if ($LASTEXITCODE -ne 0) { throw "API Enablement failed" }
 Start-Sleep -Seconds 60 # Wait for API propagation
 
+# Set the active project for gcloud (needed for subsequent scripts)
+gcloud config set project $ProjectId
+
 # 2. Container Build (Remote via Cloud Build)
 Write-Host "`n[2/3] Building Dashboard Container via Cloud Build..." -ForegroundColor Yellow
 gcloud builds submit --tag "gcr.io/${ProjectId}/dashboard:latest" . --project $ProjectId
@@ -41,8 +46,19 @@ Write-Host "`n[3/3] Provisioning Infrastructure with Terraform..." -ForegroundCo
 $DeployId = Get-Date -Format "yyyyMMddHHmmss"
 Set-Location terraform
 terraform init
-terraform apply -var="project_id=$ProjectId" -var="region=$Region" -var="deploy_id=$DeployId" -var="recipient_email=$RecipientEmail" -var="allowed_user_email=$RecipientEmail" -auto-approve
+terraform apply -auto-approve `
+    -var="project_id=$ProjectId" `
+    -var="region=$Region" `
+    -var="recipient_email=$RecipientEmail" `
+    -var="allowed_user_email=$RecipientEmail" `
+    -var="apigee_host=$ApigeeHost"
 if ($LASTEXITCODE -ne 0) { throw "Terraform Apply failed" }
+
+# 4. Deploy Apigee Proxy (Smart Bundling)
+Write-Host "`n[4/4] Deploying Apigee Proxy..." -ForegroundColor Yellow
+Set-Location ..
+.\scripts\bundle_apigee.ps1 -Environment $ApigeeEnv
+if ($LASTEXITCODE -ne 0) { throw "Apigee Deployment failed" }
 
 Write-Host "`n✅ DEPLOYMENT SUCCESSFUL! ✅" -ForegroundColor Green
 Write-Host "Next Steps:"

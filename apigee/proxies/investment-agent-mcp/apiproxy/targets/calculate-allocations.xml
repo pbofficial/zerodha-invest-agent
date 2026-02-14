@@ -2,12 +2,12 @@
 <TargetEndpoint name="calculate-allocations">
     <HTTPTargetConnection>
         <Properties>
-            <Property name="io.timeout.millis">120000</Property>
+            <Property name="io.timeout.millis">300000</Property>
         </Properties>
-        <URL>https://calculate-allocations-tanlcp3fpq-uk.a.run.app</URL>
+        <URL>CALCULATE_ALLOCATIONS_URL_PLACEHOLDER</URL>
         <Authentication>
             <GoogleIDToken>
-                <Audience>https://calculate-allocations-tanlcp3fpq-uk.a.run.app</Audience>
+                <Audience>CALCULATE_ALLOCATIONS_URL_PLACEHOLDER</Audience>
             </GoogleIDToken>
         </Authentication>
     </HTTPTargetConnection>

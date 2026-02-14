@@ -4,10 +4,10 @@
         <Properties>
             <Property name="io.timeout.millis">120000</Property>
         </Properties>
-        <URL>https://get-market-news-tanlcp3fpq-uk.a.run.app</URL>
+        <URL>GET_MARKET_NEWS_URL_PLACEHOLDER</URL>
         <Authentication>
             <GoogleIDToken>
-                <Audience>https://get-market-news-tanlcp3fpq-uk.a.run.app</Audience>
+                <Audience>GET_MARKET_NEWS_URL_PLACEHOLDER</Audience>
             </GoogleIDToken>
         </Authentication>
     </HTTPTargetConnection>

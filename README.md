@@ -15,6 +15,8 @@ An AI-powered agentic system built on Google Cloud Platform for automated, bi-mo
 For a deep dive into how this system works, please refer to the following guides:
 
 - **[System Architecture](docs/architecture.md)**: Deep dive into the Brain (AI) vs. Hands (Python) logic.
+- **[MCP Architecture & Setup](docs/mcp_architecture.md)**: Explains the Tool Abstraction and **Manual Apigee Setup**.
+- **[Security Best Practices](docs/security.md)**: Enterprise IAM, VPC-SC, and Secret Management guidelines.
 - **[Lifecycle & User Flow](docs/lifecycle.md)**: Understanding automation triggers and the "Human-in-the-Loop" process.
 - **[AI Governance & Guardrails](docs/ai_governance.md)**: How we prevent hallucinations and ensure clinical mathematical precision.
 - **[Transparency & Limitations](docs/limitations.md)**: Addressing API dependencies, token expiry, and operational risks.
@@ -50,22 +52,49 @@ The system uses **GCP Secret Manager** for all sensitive credentials. You MUST c
 > [!TIP]
 > **Gmail App Password**: Standard Gmail passwords will NOT work. You must enable 2FA and generate a dedicated App Password for the "Mail" app on "Other (Custom name)".
 
-### 3. Deployment
-Run the unified deployment script. This will provision your Cloud Functions, Firestore database, and the Streamlit Dashboard.
+### 4. Deploy Infrastructure & Proxy
+The `deploy.ps1` script handles everything: API enablement, Docker builds, Terraform, and Apigee bundling.
 
-**Windows (PowerShell):**
-```powershell
-.\deploy.ps1 -ProjectId "your-gcp-project-id" -RecipientEmail "your@email.com"
-```
+**Prerequisites:**
+1.  **Find your Apigee Hostname**:
+    *   Go to **Apigee Console > Admin > Environments > Groups**.
+    *   Copy the **Hostname** (e.g., `34.xxx.xxx.xxx.nip.io` or your custom domain).
+    *   *Note*: If you are using a raw IP, use that (e.g., `10.140.24.2`).
 
-**Linux / macOS (Bash):**
-```bash
-chmod +x deploy.sh
-./deploy.sh "your-gcp-project-id" "your@email.com"
-```
+2.  **Run Deployment**:
+    ```powershell
+    .\deploy.ps1 `
+      -ProjectId "your-project-id" `
+      -RecipientEmail "your-email@example.com" `
+      -ApigeeEnv "eval" `
+      -ApigeeHost "investment-agent.example.com" 
+    ```
+    *Replace `investment-agent.example.com` with your actual Apigee Hostname.*
 
-### 4. Initial Load
+This script will:
+1.  Enable necessary Google Cloud APIs.
+2.  Build the Dashboard container and push to GCR.
+3.  Deploy Cloud Functions, Secrets, and Cloud Run via Terraform.
+4.  Smart-Bundle the Apigee Proxy (injecting live Cloud Run URLs) and deploy it.
+
+### 5. Post-Deployment Verification
 After deployment, go to the **Config** tab in your Streamlit Dashboard. Upload or enter your stock universe and budget. The agent will prefer these cloud values over local files.
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+1. **"Permission Denied" (403) on Secrets**:
+   - Ensure the `zerodha-agent-sa` has the `Secret Manager Secret Accessor` role.
+   - Verify that you have added a **Version** to the secret in the GCP Console.
+   
+2. **"MCP Endpoint Unreachable"**:
+   - Check if your Apigee Environment is deployed and healthy.
+   - Verify the `APIGEE_MCP_ENDPOINT` variable in your Cloud Functions.
+   - Ensure the `APIGEE_HOST_HEADER` is correct for your custom domain.
+
+3. **"Malformed Function Call"**:
+   - This usually means the AI model is hallucinating code. The latest update hardens the system prompt against this.
+   - Check logs in the Dashboard for the raw model response.
 
 ## ⚖️ Governance
 The system uses a **Human-in-the-loop** model. The AI suggests trades, but execution requires manual approval via the Streamlit Dashboard.

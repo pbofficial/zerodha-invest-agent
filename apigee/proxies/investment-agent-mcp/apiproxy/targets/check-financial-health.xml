@@ -2,12 +2,12 @@
 <TargetEndpoint name="check-financial-health">
     <HTTPTargetConnection>
         <Properties>
-            <Property name="io.timeout.millis">120000</Property>
+            <Property name="io.timeout.millis">300000</Property>
         </Properties>
-        <URL>https://check-financial-health-tanlcp3fpq-uk.a.run.app</URL>
+        <URL>CHECK_FINANCIAL_HEALTH_URL_PLACEHOLDER</URL>
         <Authentication>
             <GoogleIDToken>
-                <Audience>https://check-financial-health-tanlcp3fpq-uk.a.run.app</Audience>
+                <Audience>CHECK_FINANCIAL_HEALTH_URL_PLACEHOLDER</Audience>
             </GoogleIDToken>
         </Authentication>
     </HTTPTargetConnection>

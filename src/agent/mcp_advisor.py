@@ -121,7 +121,8 @@ Your advice determines the financial future of high-net-worth clients. Do not fa
                 headers["x-api-key"] = self.api_key
             
             # Critical: Apigee requires specific Host header for routing
-            headers["Host"] = "pb-ai-focus.dns-replaceme.example.com"
+            # Use environment variable or a safe placeholder that must be overridden
+            headers["Host"] = os.environ.get("APIGEE_HOST_HEADER", "investment-agent.example.com")
             
             response = requests.get(
                 f"{self.mcp_endpoint}/mcp/v1/list_tools",
@@ -161,7 +162,7 @@ Your advice determines the financial future of high-net-worth clients. Do not fa
                 headers["x-api-key"] = self.api_key
             
             # Critical: Apigee requires specific Host header for routing
-            headers["Host"] = "pb-ai-focus.dns-replaceme.example.com"
+            headers["Host"] = os.environ.get("APIGEE_HOST_HEADER", "investment-agent.example.com")
             
             # The Apigee proxy routes based on path suffix /calculate_orders etc.
             url = f"{self.mcp_endpoint}/mcp/{tool_name}"

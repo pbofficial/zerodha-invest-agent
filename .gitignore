@@ -109,3 +109,7 @@ __marimo__/
 *.zip
 *.tar.gz
 *.7z
+# Build artifacts
+build_temp/
+test_zip/
+function_source.zip

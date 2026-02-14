@@ -11,3 +11,5 @@ __pycache__/
 *.zip
 *.ps1
 deploy.sh
+build_temp/
+function_source.zip

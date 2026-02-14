@@ -26,7 +26,13 @@ variable "model_name" {
 }
 
 variable "apigee_mcp_endpoint" {
-  description = "The internal Apigee MCP endpoint"
+  description = "The internal load balancer IP/URL for Apigee"
   type        = string
   default     = "https://10.140.24.2"
+}
+
+variable "apigee_host" {
+  description = "The Host header required by Apigee Environment Group (e.g. investment-agent.example.com)"
+  type        = string
+  default     = "investment-agent.example.com"
 }
