@@ -33,8 +33,9 @@ def main(request):
         
     elif "check-financial-health" in service_name or "check_financial_health" in service_name:
         from src.functions.fundamentals.main import check_financial_health
-        ticker = data.get("ticker", "")
-        return json.dumps(check_financial_health(ticker))
+        tickers = data.get("tickers") or data.get("ticker") or []
+        if isinstance(tickers, str): tickers = [tickers]
+        return json.dumps(check_financial_health(tickers))
         
     elif "get-market-news" in service_name or "get_market_news" in service_name:
         from src.functions.news.main import get_market_news

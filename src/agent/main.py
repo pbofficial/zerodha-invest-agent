@@ -106,15 +106,14 @@ These are the ONLY stocks you are allowed to check and invest in:
 ----------------
 
 Process:
-1. Identify the universe of stocks to consider (Use the full list above).
-2. Fetch News (get_market_news) for **ALL** these stocks.
+1. **MANDATORY FIRST STEP**: Call `get_market_snapshot(tickers=['ALL'])` to get the current portfolio and market prices for the ENTIRE universe.
+2. Fetch News (get_market_news) for **ALL** tickers in the universe (pass the full list in one batch) to check for governance risks.
 3. Apply the News Relevance Protocol. Calculate risk scores for each stock. 
    - NOTE: Tickers like 'EMBASSY-RR' are valid and mapped correctly; do not skip them.
 4. Explain your thought process for **EVERY SINGLE TICKER** in the universe, even if briefly. Do not omit any from your analysis.
 5. Filter out any stocks with a Risk Score >= {risk_threshold}.
-6. Check Financial Health (check_financial_health) for remaining stocks. Exclude any with 'WARNING' status.
-7. Fetch Market Data (get_market_snapshot) for the safe stocks.
-8. Calculate Allocations (calculate_orders) using the safe list and your budget. 
+6. Check Financial Health (check_financial_health) for **ALL** remaining candidates in one batch (pass list of tickers). Exclude any with 'WARNING' status.
+7. Calculate Allocations (calculate_allocations) using the safe list and your budget. 
    - CRITICAL: The budget provided is the **TOTAL AGGREGATE** for the entire run. It must be distributed across all tickers. It is NOT a per-ticker limit.
 9. Finalize the list. If a stock is missing from the proposal, clearly state WHY in your thoughts (e.g., 'Target Met', 'High Risk', or 'Exceeded Global Budget').
 
@@ -172,9 +171,9 @@ get_market_news_func = FunctionDeclaration(
     },
 )
 
-calculate_orders_func = FunctionDeclaration(
-    name="calculate_orders",
-    description="Calculates the optimal stock orders to rebalance the portfolio based on a TOTAL global budget.",
+calculate_allocations_func = FunctionDeclaration(
+    name="calculate_allocations",
+    description="Calculates the optimal stock allocations (orders) to rebalance the portfolio based on a TOTAL global budget.",
     parameters={
         "type": "object",
         "properties": {
@@ -211,12 +210,13 @@ check_financial_health_func = FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
-            "ticker": {
-                "type": "string",
-                "description": "NSE Ticker Symbol (e.g. 'HDFCBANK')"
+            "tickers": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of NSE Ticker Symbols (e.g. ['HDFCBANK', 'RELIANCE'])"
             }
         },
-        "required": ["ticker"]
+        "required": ["tickers"]
     },
 )
 
@@ -226,7 +226,7 @@ invest_tool = Tool(
         get_market_snapshot_func,
         get_market_news_func,
         check_financial_health_func,
-        calculate_orders_func
+        calculate_allocations_func
     ],
 )
 
@@ -401,7 +401,7 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
         'get_market_snapshot': get_market_snapshot,
         'get_market_news': get_market_news,
         'check_financial_health': check_financial_health,
-        'calculate_orders': calculate_orders_wrapper
+        'calculate_allocations': calculate_orders_wrapper
     }
 
     # Execute Chat Loop (Simple Automatic Function Calling)
@@ -430,10 +430,11 @@ def run_agent(auto_execute=False, budget_override=None, specific_tickers=None, s
                     result = mcp_advisor._execute_tool(func_name, func_args)
                     
                     # Special Case: Capture orders for consolidation logic below
-                    if func_name == 'calculate_orders':
+                    # Handle both internal name (calculate_orders) and Apigee public name (calculate-allocations)
+                    if func_name in ['calculate_orders', 'calculate_allocations', 'calculate-allocations']:
                         # The tool returns a list of orders. We need to save it.
                         captured_orders = result if isinstance(result, list) else result.get('result', [])
-                        logger.info(f"DEBUG: [MCP] calculate_orders returned {len(captured_orders)} items.")
+                        logger.info(f"DEBUG: [MCP] {func_name} returned {len(captured_orders)} items.")
 
                     function_responses.append(
                         vertexai.generative_models.Part.from_function_response(

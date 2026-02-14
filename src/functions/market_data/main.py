@@ -116,6 +116,21 @@ def is_trading_day(target_date=None):
 def get_market_snapshot(tickers: list):
     logger.info(f"Fetching snapshot for {len(tickers)} tickers")
     
+    # 0. Handle 'ALL' keyword
+    if tickers and (tickers == ['ALL'] or tickers[0] == 'ALL'):
+        logger.info("Resolving 'ALL' tickers from Universe + Holdings...")
+        try:
+            from src.utils.config_loader import config
+            universe = config.get_universe().get("assets", [])
+            u_tickers = [a["ticker"] for a in universe]
+            
+            # We'll merge with holdings later, but start with universe
+            tickers = u_tickers
+            logger.info(f"Resolved 'ALL' to {len(tickers)} universe assets.")
+        except Exception as e:
+            logger.error(f"Failed to resolve universe for 'ALL': {e}")
+            tickers = [] # Fallback to just holdings (added below)
+
     # 1. Kite Holdings
     kite = get_kite_client()
     holdings = []
@@ -131,8 +146,18 @@ def get_market_snapshot(tickers: list):
     enriched_metadata = {}
     alerts = {}
 
-    for ticker in tickers:
+    import concurrent.futures
+
+    def _fetch_single_ticker(ticker, cache_ref):
+        """Helper to fetch data for a single ticker."""
         yf_sym = map_ticker_to_yf(ticker)
+        result = {
+            "ticker": ticker,
+            "price": None,
+            "metadata": None,
+            "alert": None
+        }
+        
         try:
             t = yf.Ticker(yf_sym)
             
@@ -142,40 +167,76 @@ def get_market_snapshot(tickers: list):
                 hist = t.history(period="1d")
                 if not hist.empty:
                     price = round(float(hist['Close'].iloc[-1]), 2)
-                    valid_prices[ticker] = price
+                    result["price"] = price
                 else:
                     # Fallback to fast_info
                     price = round(float(t.fast_info['last_price']), 2)
-                    valid_prices[ticker] = price
+                    result["price"] = price
             except:
                 logger.warning(f"Price fetch failed for {yf_sym}")
             
             # Fetch Metadata (if not in cache or generic)
-            if yf_sym not in cache or cache[yf_sym].get("sector") == "Unknown":
-                logger.info(f"Enriching metadata for {yf_sym}")
+            # Note: cache_ref is a copy or ref, modifying it here might be thread-unsafe if writing
+            # But we are reading mostly. We will return the metadata to update the main cache safely.
+            meta_data = None
+            if yf_sym not in cache_ref or cache_ref[yf_sym].get("sector") == "Unknown":
+                # logger.info(f"Enriching metadata for {yf_sym}")
                 info = t.info
-                cache[yf_sym] = {
+                meta_data = {
                     "sector": info.get("sector", "Other"),
                     "cap_type": classify_cap(info.get("marketCap", 0)),
                     "risk_beta": info.get("beta", 1.0)
                 }
+            else:
+                meta_data = cache_ref[yf_sym]
             
-            enriched_metadata[ticker] = cache[yf_sym]
+            result["metadata"] = (yf_sym, meta_data) # Return (key, value)
             
         except Exception as e:
             logger.error(f"Failed {yf_sym}: {e}")
-            alerts[ticker] = f"DATA_ERROR: {str(e)}"
+            result["alert"] = f"DATA_ERROR: {str(e)}"
+            
+        return result
+
+    # Execute in Parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_ticker = {executor.submit(_fetch_single_ticker, t, cache): t for t in tickers}
+        
+        for future in concurrent.futures.as_completed(future_to_ticker):
+            try:
+                res = future.result()
+                t = res["ticker"]
+                
+                # Update Prices
+                if res["price"] is not None:
+                    valid_prices[t] = res["price"]
+                
+                # Update Metadata & Cache
+                if res["metadata"]:
+                    yf_sym_key, meta_val = res["metadata"]
+                    # Update local cache safely (main thread)
+                    cache[yf_sym_key] = meta_val
+                    enriched_metadata[t] = meta_val
+                
+                # Update Alerts
+                if res["alert"]:
+                    alerts[t] = res["alert"]
+                    
+            except Exception as exc:
+                t = future_to_ticker[future]
+                logger.error(f"Snapshot thread failed for {t}: {exc}")
+                alerts[t] = "THREAD_ERROR"
 
     save_cache(cache)
     
     # Check for delisted/errors
     for t in tickers:
-        if t not in valid_prices:
-            alerts[t] = "PRICE_MISSING"
+        if t not in valid_prices and t not in alerts:
+             alerts[t] = "PRICE_MISSING"
 
     return {
         "prices": valid_prices,
         "holdings": holdings,
-        "metadata": enriched_metadata, # Added metadata for dashboard
+        "metadata": enriched_metadata,
         "alerts": alerts
     }

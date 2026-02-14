@@ -40,7 +40,7 @@ resource "google_cloudfunctions2_function" "get_portfolio" {
   }
 
   service_config {
-    max_instance_count = 1
+    max_instance_count = 3
     available_memory   = "1Gi"
     available_cpu      = "1"
     timeout_seconds    = 300
@@ -77,7 +77,7 @@ resource "google_cloudfunctions2_function" "calculate_allocations" {
   }
 
   service_config {
-    max_instance_count = 1
+    max_instance_count = 3
     available_memory   = "2Gi"
     available_cpu      = "1"
     timeout_seconds    = 300
@@ -114,7 +114,7 @@ resource "google_cloudfunctions2_function" "execute_trade" {
   }
 
   service_config {
-    max_instance_count = 1
+    max_instance_count = 3
     available_memory   = "2Gi"
     available_cpu      = "1"
     timeout_seconds    = 300
@@ -195,7 +195,7 @@ resource "google_cloudfunctions2_function" "trigger_nudge" {
   }
 
   service_config {
-    max_instance_count = 1
+    max_instance_count = 3
     available_memory   = "1Gi"
     available_cpu      = "1"
     timeout_seconds    = 300
@@ -258,7 +258,7 @@ resource "google_cloudfunctions2_function" "morning_execution" {
   }
 
   service_config {
-    max_instance_count = 1
+    max_instance_count = 3
     available_memory   = "1Gi"
     available_cpu      = "1"
     timeout_seconds    = 300
@@ -321,10 +321,10 @@ resource "google_cloudfunctions2_function" "check_financial_health" {
   }
 
   service_config {
-    max_instance_count = 1
+    max_instance_count = 3
     available_memory   = "512Mi"
     available_cpu      = "0.5"
-    timeout_seconds    = 60
+    timeout_seconds    = 300
     
     vpc_connector = google_vpc_access_connector.connector.id
     
@@ -358,10 +358,10 @@ resource "google_cloudfunctions2_function" "get_market_news" {
   }
 
   service_config {
-    max_instance_count = 1
+    max_instance_count = 3
     available_memory   = "512Mi"
     available_cpu      = "0.5"
-    timeout_seconds    = 60
+    timeout_seconds    = 300
     
     vpc_connector = google_vpc_access_connector.connector.id
     

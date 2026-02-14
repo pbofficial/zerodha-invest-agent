@@ -76,14 +76,19 @@ These are the ONLY stocks you are allowed to check and invest in:
 ----------------
 
 Process:
-1. Identify the universe of stocks relevant to the query.
-2. Fetch News (get_market_news) to check for governance risks or scandals.
-3. Apply the News Relevance Protocol. Calculate risk scores.
-4. Explain your thought process transparently. Do not hide risks.
-5. Filter out any stocks with a Risk Score >= {risk_threshold}.
-6. Check Financial Health (check_financial_health). Exclude any with 'WARNING' status.
-7. Fetch Market Data (get_market_snapshot) for detailed price and holding info.
-8. Calculate Allocations (calculate_orders) if a trade suggestion is needed.
+1. **MANDATORY FIRST STEP**: You MUST call `get_market_snapshot(tickers=['ALL'])` to get the current portfolio and market prices.
+2. Identify the universe of stocks relevant to the query.
+3. Fetch News (get_market_news) for **ALL** identified tickers (pass the full list) to check for governance risks.
+4. Apply the News Relevance Protocol. Calculate risk scores.
+5. Explain your thought process transparently. Do not hide risks.
+6. Filter out any stocks with a Risk Score >= {risk_threshold}.
+7. Check Financial Health (check_financial_health) for **each** candidate. Exclude any with 'WARNING' status.
+8. Calculate Allocations (calculate_allocations) if a trade suggestion is needed.
+
+**CRITICAL PROTOCOLS**:
+1. **TOOL USE**: usage of tools is MANDATORY. Do NOT generate advice based on your internal knowledge alone.
+2. **NO CODE**: Do NOT write Python code or use `print()`. Use the provided tools directly via JSON function calling.
+3. **REBALANCING**: Only call `calculate_allocations` if the user *explicitly* asks for rebalancing, trade suggestions, or portfolio optimization. Do NOT call it for general market updates.
 
 Confidence Level: Act with the confidence of a veteran fund manager who handles billions in AUM. Be precise, cynical, and never optimistic without data.
 Your advice determines the financial future of high-net-worth clients. Do not fail them.
@@ -126,14 +131,17 @@ Your advice determines the financial future of high-net-worth clients. Do not fa
             )
             response.raise_for_status()
             tools_data = response.json()
-            
             tools = []
+            
             for t in tools_data.get('tools', []):
-                # MCP format usually matches FunctionDeclaration but we ensure it
+                # MCP format uses 'inputSchema', while Vertex expects 'parameters'
+                # Logic: Use .get() to fall back gracefully
+                parameters = t.get('parameters') or t.get('inputSchema') or {"type": "object", "properties": {}}
+                
                 tools.append(FunctionDeclaration(
                     name=t['name'],
                     description=t['description'],
-                    parameters=t['parameters']
+                    parameters=parameters
                 ))
 
             logger.info(f"✨ Discovered {len(tools)} tools via Apigee MCP")
@@ -169,7 +177,7 @@ Your advice determines the financial future of high-net-worth clients. Do not fa
             
             logger.debug(f"📡 Sending request to Apigee: {url} with payload: {json.dumps(payload)}")
             
-            response = requests.post(url, headers=headers, json=payload, timeout=30, verify=False)
+            response = requests.post(url, headers=headers, json=payload, timeout=300, verify=False)
             response.raise_for_status()
             
             result = response.json()
@@ -241,44 +249,74 @@ Your advice determines the financial future of high-net-worth clients. Do not fa
         """Generates an elite portfolio health check."""
         
         system_instruction = f"""
-        You are an ELITE Risk Manager and Investment Advisor for Ultra-High-Net-Worth individuals.
+        You are an ELITE Risk Manager and Investment Advisor.
         Your DNA is skepticism. Your goal is CAPITAL PRESERVATION above all else.
         
         CORE DIRECTIVES:
-        1. **NO FLUFF**: Do not use generic phrases like "market conditions". Be specific.
-        2. **DATA OR SILENCE**: If you don't have the data, say "Insufficient Data". Do not guess.
+        1. **NO FLUFF**: Do not use generic phrases. Be specific.
+        2. **DATA OR SILENCE**: If you don't have the data, say "Insufficient Data".
         3. **RISK PARANOIA**: Assume every stock has a hidden flaw. Find it.
         
         Risk Threshold: {self.settings.get("risk_threshold", 8)}/10.
         
-        Generate an "Elite Portfolio Health Check" following this structure:
-        1. **Alpha Concentration**: Are we over-exposed to one sector? (Threshold: >30% is Critical Risk).
-        2. **Black Swan Sentry**: Based on the holdings, what is the single biggest "What If" risk? (e.g. "If Oil drops...")
-        3. **Overexposure Alert**: Call out any single stock >15% of portfolio.
-        4. **Verdict**: "PREMIUM STABILITY" (Low Risk) or "VULNERABLE ASSETS" (High Risk).
+        Generate an "Elite Portfolio Health Check" as a strictly formatted JSON object. 
+        DO NOT return markdown. Return ONLY the JSON.
+        
+        JSON Structure:
+        {{
+            "alpha_concentration": {{
+                "status": "High" | "Medium" | "Low",
+                "score": 0-10,
+                "details": "Specific sector or stock concentration risks."
+            }},
+            "black_swan": {{
+                "risk_event": "Name of the black swan event (e.g. Oil Shock, Regulators)",
+                "probability": "Low" | "Medium" | "High",
+                "impact_details": "What happens to the portfolio if this event occurs?"
+            }},
+            "overexposure": {{
+                "tickers": ["TICKER1", "TICKER2"],
+                "details": "List stocks >15% of portfolio and why they are risky/safe."
+            }},
+            "verdict": {{
+                "status": "PREMIUM STABILITY" | "BALANCED" | "VULNERABLE ASSETS",
+                "risk_score": 0-10 (0=Safe, 10=Critical),
+                "summary": "One sentence executive summary of the portfolio health."
+            }}
+        }}
         """
         
         prompt = f"""
         PORTFOLIO SNAPSHOT:
         {json.dumps(holdings_json, indent=2)}
         
-        Execute the Health Check. Be brutal.
+        Execute the Health Check. Return JSON only.
         """
         
-        # We use a fresh model instance for reporting to avoid tool-use confusion if any
+        # We use a fresh model instance for reporting
         report_model = GenerativeModel(self.model_name, system_instruction=system_instruction)
         response = report_model.generate_content(prompt)
         
+        report_text = ""
+        report_json = {}
+        
         try:
+            from src.utils.llm_helpers import extract_json_from_text
             report_text = response.text
-        except AttributeError:
-             report_text = "AI Advisor failed to generate text for the report."
+            report_json = extract_json_from_text(report_text)
+            if not report_json:
+                 # Fallback if cleaner fails
+                 report_json = json.loads(report_text.replace("```json", "").replace("```", ""))
+        except Exception as e:
+             logger.error(f"Failed to parse report JSON: {e}")
+             report_text = "AI Advisor failed to generate structured report."
         
         # Save to Firestore
         doc_ref = self.db.collection("advisor_reports").document("latest")
         doc_ref.set({
             "generated_at": datetime.now(),
-            "report_text": report_text,
+            "report_text": report_text, # Keep raw text as backup
+            "report_json": report_json, # Primary structured data
             "source_data_snapshot": holdings_json
         })
         

@@ -44,8 +44,8 @@
         <Condition>(proxy.pathsuffix MatchesPath "/get_market_snapshot") or (mcp.tool_name = "get_market_snapshot")</Condition>
         <TargetEndpoint>get-portfolio</TargetEndpoint>
     </RouteRule>
-    <RouteRule name="calculate_orders">
-        <Condition>(proxy.pathsuffix MatchesPath "/calculate_orders") or (mcp.tool_name = "calculate_orders")</Condition>
+    <RouteRule name="calculate_allocations">
+        <Condition>(proxy.pathsuffix MatchesPath "/calculate_allocations") or (mcp.tool_name = "calculate_allocations")</Condition>
         <TargetEndpoint>calculate-allocations</TargetEndpoint>
     </RouteRule>
     <RouteRule name="check_financial_health">

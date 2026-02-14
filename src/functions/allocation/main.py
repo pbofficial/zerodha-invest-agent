@@ -14,6 +14,10 @@ def calculate_orders(budget, portfolio, prices, targets, target_amounts=None):
     """
     
     # Helper to normalize tickers (remove exchange prefixes)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"💰 Allocation Budget: {budget} | Portfolio Size: {len(portfolio)} | Targets: {len(targets)}")
+
     def norm(t): return str(t).split(':')[-1].upper() if ':' in str(t) else str(t).upper()
 
     # Map portfolio to easier lookup with NORMALIZED tickers
@@ -48,12 +52,30 @@ def calculate_orders(budget, portfolio, prices, targets, target_amounts=None):
         # Determine Status wrt Target Amount
         status = "ACTIVE"
         gap = 0
-        if norm_target_amounts and ticker in norm_target_amounts:
+        
+        # Calculate Dynamic Target Amount
+        # Priority 1: Explicit Absolute Target
+        # Priority 2: Weight * (Current Portfolio Value + Budget)
+        t_amt = 0
+        if norm_target_amounts and ticker in norm_target_amounts and norm_target_amounts[ticker] > 0:
             t_amt = norm_target_amounts[ticker]
+        elif weight > 0:
+            # Estimate Projected Portfolio Value (Conservative)
+            # This is a heuristic: it assumes we will spend the full budget.
+            # In accurate terms, we should iterate, but for 1-pass this is okay.
+            projected_total = current_holdings_value + budget
+            t_amt = projected_total * weight
+            
+        if t_amt > 0:
             if cost_basis >= t_amt:
                 status = "MET"
             else:
                 gap = t_amt - cost_basis
+        else:
+             # No target set (Amount 0 and Weight 0) -> Ignore or Keep Active?
+             # If we want to buy "rest" with budget, we need a strategy.
+             # For now, treat as MET/Passive.
+             status = "PASSIVE"
 
         analysis_results.append({
             "ticker": ticker,
@@ -62,7 +84,8 @@ def calculate_orders(budget, portfolio, prices, targets, target_amounts=None):
             "current_cost": cost_basis,
             "status": status,
             "gap": gap,
-            "weight": weight
+            "weight": weight,
+            "target_amt_used": t_amt
         })
 
     # --- Step 2: Allocation Logic (Budget Based) ---

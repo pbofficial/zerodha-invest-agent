@@ -402,7 +402,7 @@ def format_agent_logs(raw_logs):
                 "get_market_news": "Global News Pulse",
                 "check_financial_health": "Fundamental Audit",
                 "get_market_snapshot": "Live Price Feed",
-                "calculate_orders": "Allocation Engine",
+                "calculate_allocations": "Allocation Engine",
                 "save_draft_proposal": "Drafting Plan"
             }
             display_name = tool_map.get(tool_name, tool_name.replace("_", " ").title())
@@ -967,7 +967,41 @@ elif st.session_state["active_tab"] == "🧠 AI Insights":
             if doc.exists:
                 report_data = doc.to_dict()
                 st.caption(f"Last Generated: {report_data.get('generated_at').strftime('%Y-%m-%d %H:%M')}")
-                st.markdown(report_data.get("report_text"))
+                
+                # Try to render structured JSON first
+                r_json = report_data.get("report_json")
+                if r_json and isinstance(r_json, dict):
+                    # 1. Top Verdict
+                    verdict = r_json.get("verdict", {})
+                    v_score = verdict.get("risk_score", 0)
+                    v_status = verdict.get("status", "UNKNOWN")
+                    
+                    v_color = "normal"
+                    if v_score >= 8: v_color = "inverse"
+                    elif v_score <= 4: v_color = "off"
+                    
+                    st.metric("Health Verdict", v_status, delta=f"Risk Score: {v_score}/10", delta_color=v_color)
+                    st.info(f"💡 {verdict.get('summary', 'No summary provided.')}")
+                    
+                    # 2. Risk Factors (Expanders)
+                    with st.expander("🦅 Alpha Concentration", expanded=False):
+                        ac = r_json.get("alpha_concentration", {})
+                        st.markdown(f"**Status:** {ac.get('status', 'Unknown')} (Score: {ac.get('score',0)})")
+                        st.markdown(ac.get("details", "No details."))
+
+                    with st.expander("🦢 Black Swan Sentry", expanded=False):
+                        bs = r_json.get("black_swan", {})
+                        st.error(f"**Event:** {bs.get('risk_event', 'None')}")
+                        st.caption(f"Probability: {bs.get('probability', 'Unknown')}")
+                        st.markdown(bs.get("impact_details", "No impact details."))
+
+                    with st.expander("⚖️ Overexposure Check", expanded=False):
+                        oe = r_json.get("overexposure", {})
+                        st.write(f"**Flagged:** {', '.join(oe.get('tickers', []))}")
+                        st.markdown(oe.get("details", "No details."))
+                else:
+                    # Fallback to text
+                    st.markdown(report_data.get("report_text"))
             else:
                 st.info("No reports yet. Click 'Generate' above.")
         except: pass

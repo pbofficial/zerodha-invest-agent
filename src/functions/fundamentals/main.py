@@ -12,17 +12,36 @@ logger = logging.getLogger(__name__)
 # YFINANCE_MAP removed in Phase 3
 YFINANCE_MAP = {}
 
-def check_financial_health(ticker: str):
+def check_financial_health(ticker):
     """
     Fetches quarterly financials from Yahoo Finance and checks for profit trends.
+    Supports both single ticker (str) and batch (list).
     
     Args:
-        ticker (str): NSE Ticker symbol (e.g. 'HDFCBANK')
+        ticker (str | list): NSE Ticker symbol(s)
         
     Returns:
-        dict: {'status': 'OK'|'WARNING', 'reason': str}
+        dict: {'TICKER': {'status': 'OK'|'WARNING', 'reason': str}} (if batch)
+              OR {'status': 'OK', 'reason': str} (if single for backward compat)
     """
     
+    # Batch Mode Handler
+    if isinstance(ticker, list):
+        results = {}
+        import concurrent.futures
+        
+        def process_one(t):
+            res = check_financial_health(t)
+            return t, res
+            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_url = {executor.submit(process_one, t): t for t in ticker}
+            for future in concurrent.futures.as_completed(future_to_url):
+                t, res = future.result()
+                results[t] = res
+        return results
+
+    # --- Single Ticker Logic ---
     # Normalize ticker (remove exchange prefixes)
     clean_ticker = ticker.split(':')[-1].upper() if ':' in ticker else ticker.upper()
     yf_symbol = f"{clean_ticker}.NS" if not (clean_ticker.endswith(".NS") or clean_ticker.endswith(".BO")) else clean_ticker

@@ -124,3 +124,17 @@ resource "google_project_iam_member" "secret_uploader" {
   role    = "roles/secretmanager.secretVersionAdder"
   member  = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
 }
+
+resource "google_secret_manager_secret_iam_member" "kite_api_key_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.kite_api_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "kite_access_token_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.kite_access_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.zerodha_agent_sa.email}"
+}

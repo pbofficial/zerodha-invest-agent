@@ -1,10 +1,13 @@
 # Package Apigee Proxy
+# Resolve Project Root (one level up from scripts folder)
+$ProjectRoot = Resolve-Path "$PSScriptRoot/.."
 $ProxyName = "investment-agent-mcp"
-$SourcePath = "apigee/proxies/$ProxyName/apiproxy"
-$ZipPath = "apigee/proxies/$ProxyName.zip"
+$SourcePath = "$ProjectRoot/apigee/proxies/$ProxyName/apiproxy"
+$ZipPath = "$ProjectRoot/apigee/proxies/$ProxyName.zip"
 
 # Zip the apiproxy folder using Python to ensure forward slashes
-python scripts/zip_proxy.py
+python "$PSScriptRoot/zip_proxy.py"
+if ($LASTEXITCODE -ne 0) { throw "Bundling failed" }
 Write-Host "✅ Proxy bundled successfully: $ZipPath"
 
 Write-Host "`n🚀 Deploying to Apigee..." -ForegroundColor Cyan
