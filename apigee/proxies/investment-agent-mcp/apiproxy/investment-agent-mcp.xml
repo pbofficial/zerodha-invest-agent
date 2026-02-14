@@ -13,7 +13,6 @@
         <Proxy>default</Proxy>
     </Proxies>
     <Policies>
-        <Policy>MapFunctionNames</Policy>
         <Policy>Verify-API-Key</Policy>
         <Policy>MCP-Router</Policy>
         <Policy>MCP-ListTools</Policy>
@@ -21,7 +20,6 @@
     </Policies>
     <Resources>
         <Resource>openapi://investment_tools.yaml</Resource>
-        <Resource>jsc://map_paths.js</Resource>
     </Resources>
     <Targets>
         <Target>get-portfolio</Target>
