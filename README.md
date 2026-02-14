@@ -57,9 +57,10 @@ The `deploy.ps1` script handles everything: API enablement, Docker builds, Terra
 
 **Prerequisites:**
 1.  **Find your Apigee Hostname**:
-    *   Go to **Apigee Console > Admin > Environments > Groups**.
-    *   Copy the **Hostname** (e.g., `34.xxx.xxx.xxx.nip.io` or your custom domain).
-    *   *Note*: If you are using a raw IP, use that (e.g., `10.140.24.2`).
+    *   **In the Console**: Go to **Apigee Console > Admin > Environments > Groups**.
+    *   **The "Hostname" column** contains the entry point for your proxy (e.g., `34.xxx.xxx.xxx.nip.io` or `investment-agent.example.com`).
+    *   **Why this matters?**: The Agent Dashboard uses this hostname to route tool calls through the Apigee Gateway.
+    *   *Note*: If you have not yet created an Environment Group, you must do so and attach it to your Environment (e.g., `eval`).
 
 2.  **Run Deployment**:
     ```powershell
@@ -79,6 +80,22 @@ This script will:
 
 ### 5. Post-Deployment Verification
 After deployment, go to the **Config** tab in your Streamlit Dashboard. Upload or enter your stock universe and budget. The agent will prefer these cloud values over local files.
+
+## ☁️ Core GCP Components
+
+This project leverages a suite of GCP services. If you are blocked, verify the following in your console:
+
+| Component | Purpose | Console Link (Internal) |
+| :--- | :--- | :--- |
+| **Apigee** | MCP Gateway & Tool Registry | [Apigee Console](https://console.cloud.google.com/apigee) |
+| **API Hub** | Universal API Discovery | [API Hub](https://console.cloud.google.com/apihub) |
+| **Vertex AI** | LLM Reasoning (Gemini) | [Vertex AI Dashboard](https://console.cloud.google.com/vertex-ai) |
+| **Firestore** | Portfolio & Audit State | [Firestore Studio](https://console.cloud.google.com/firestore) |
+| **Cloud Run** | Dashboard Hosting | [Cloud Run Services](https://console.cloud.google.com/run) |
+| **Cloud Functions** | Deterministic Tool Logic | [Cloud Functions](https://console.cloud.google.com/functions) |
+| **Secret Manager**| Safe Credential Storage | [Secret Manager](https://console.cloud.google.com/security/secret-manager) |
+
+For a full mapping of IDs and resource names, see the **[GCP Component Catalog](docs/gcp_catalog.md)**.
 
 ## 🛠️ Troubleshooting
 

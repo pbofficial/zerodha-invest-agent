@@ -49,10 +49,17 @@ If `deploy.ps1` hits a snag, you can set up the core components manually:
 3. **Credentials**: Copy the **Consumer Key**. This is your `APIGEE_API_KEY`.
 4. Add this key to **Secret Manager** as `APIGEE_API_KEY`.
 
-### Step 4: API Hub Registration (Optional but Recommended)
-1. Go to **API Hub**.
-2. Register your API as `investment-agent-mcp`.
-3. Upload the OpenAPI Spec (if available) or link to the Apigee Proxy.
+### Step 4: API Hub Registration (Automated)
+The system automatically registers tools in **API Hub** during the Terraform phase (`terraform/apihub.tf`). This ensures that the AI's "Hands" are discoverable across the enterprise.
+
+1. **Automation**: A `null_resource` in Terraform uses PowerShell to call the API Hub REST API.
+2. **Registry Styling**: We apply a system attribute `system-api-style: mcp-api`. This triggers the specific **MCP Styling** in the API Hub UI, making it easy to distinguish functional tools from standard REST APIs.
+3. **Maturity Level**: Registered as `level-3` (Production Ready) and `target-user: internal`.
+
+If you need to re-register or update a tool's description, simply run:
+```powershell
+terraform apply -target=null_resource.register_apihub_tools
+```
 
 ---
 
