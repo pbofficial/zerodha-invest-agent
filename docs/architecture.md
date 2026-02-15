@@ -111,3 +111,4 @@ If we wanted to add a second broker (e.g., **Upstox**) or switch away from Zerod
 
 > [!IMPORTANT]
 > This architecture transforms the project from a "Trading App" into an "Investment Execution Grid" where providers are plug-and-play components.
+
